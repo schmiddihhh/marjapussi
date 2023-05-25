@@ -1,229 +1,100 @@
-class Card:
-    COLORS = ["r", "s", "e", "g"]
-    VALUES = ["A", "Z", "K", "O", "U", "9", "8", "7", "6"]
-
-    COLOR_NAMES = {
-        "r": "Rot",
-        "s": "Schell",
-        "e": "Eichel",
-        "g": "Grün"
-    }
-
-    def __init__(self, color, value):
-        if color not in self.COLORS:
-            raise ValueError(f"Invalid color: {color}")
-        if value not in self.VALUES:
-            raise ValueError(f"Invalid value: {value}")
-
-        self.color = color
-        self.value = value
-
-    def __str__(self):
-        return f"{self.color}-{self.value}"
-
-    def __eq__(self, other):
-        return self.color == other.color and self.value == other.value
-
-    def is_higher_than(self, other):
-        return self.VALUES.index(self.value) > self.VALUES.index(other.value)
-
-
-CARDS = [Card(c, v) for c in Card.COLORS for v in Card.VALUES]
-
+from marjapussi.card import Card, Deck, Color, Value
+from marjapussi.trick import Trick
 
 text_format = {"r": "\033[91m", "s": "\033[93m", "e": "\033[96m", "g": "\033[92m",
-                "end": "\033[0m", "bold": "\033[1m", "uline": "\033[4m"}
+               "end": "\033[0m", "bold": "\033[1m", "uline": "\033[4m"}
 
 
-def allowed_first(cards) -> list:
-    """First player has to play an ace, green or any card."""
-    allowed = [c for c in cards if c.value == 'A']
+def allowed_first(cards: list[Card]) -> list[Card]:
+    """Filters cards by allowed first: First player has to play an ace, green or any card."""
+    allowed = [c for c in cards if c.value == Value.Ass]
     if not allowed:
-        allowed = [c for c in cards if c.color == 'g']
+        allowed = [c for c in cards if c.color == Color.Gruen]
     if not allowed:
         allowed = cards[:]
     return allowed
 
 
-def high_card(cards, sup_col="") -> str:
-    """Finds the highest card in single trick."""
-    if not cards:
-        return None
-    col = cards[0].color
-    base_col_cards = [card for card in cards if card.color == col]
-    sup_col_cards = [card for card in cards if card.color == sup_col]
-    return max(sup_col_cards, default=max(base_col_cards, default=None), key=lambda card: card.VALUES.index(card.value))
+def allowed_general(hand: list[Card], trick: Trick, first=False) -> list[Card]:
+    """Sorts which cards are allowed to be played from the hand right now"""
+    if trick.get_status() == 0 and first:
+        return allowed_first(hand)
+    if trick.get_status() == 0:
+        return hand
 
-
-def allowed_general(trick, cards, sup_col=None, first=False) -> list:
-    if len(trick) == 0 and first:
-        return allowed_first(cards)
-    if not trick:
-        return cards
-
-    trick_col = trick[0].color
     if first:
         # check for ace
-        ace = next((card for card in cards if card.color == trick_col and card.value == 'A'), None)
+        ace = next((card for card in hand if card.color == trick.base_color and card.value == Value.Ass), None)
         if ace:
             return [ace]
 
-    allowed = [card for card in cards if card.color == trick_col]
-    if not allowed:
-        allowed = [card for card in cards if card.color == sup_col]
-    high = high_card(trick + allowed, sup_col=sup_col)
-    if high in allowed:
-        allowed = [high]
+    # need to play base_color first, then trump and then any. Needs to go also higher than previous trick cards
+    allowed = [card for card in hand if card.color == trick.base_color]
+    if not allowed and trick.trump_color:
+        allowed = [card for card in hand if card.color == trick.trump_color]
+    high_cards = higher_cards(trick, allowed)
+    if high_cards:
+        allowed = high_cards
 
-    return allowed if allowed else cards
-
-
-def higher_value(base, card) -> bool:
-    """Returns True if card has higher value than base."""
-    return card.is_higher_than(base)
+    return allowed if allowed else hand
 
 
-def higher_cards(base, sup_col='', pool=CARDS) -> list:
-    """Returns all cards out of the pool that would win a trick over base as high card."""
-    if not sup_col:
-        return [card for card in pool if card.is_higher_than(base) and base.color == card.color]
-    return [card for card in pool if (card.is_higher_than(base) and base.color == card.color) or (card.color == sup_col)]
+def higher_cards(trick: Trick, card_pool: list[Card] | set[Card] = None) -> list[Card]:
+    """Returns all cards out of the pool that would win the given trick."""
+    # default: Check all cards for higher cards
+    if card_pool is None:
+        card_pool = Deck().cards
+    if trick.get_status():
+        # trick is trump color trick
+        if trick.trump_color == trick.base_color:
+            return [c for c in card_pool if trick.base_color == c.color and c.value > trick.high_card.value]
+        # trick has been taken over by trump, but with different base color, can only be beaten by trump
+        elif trick.trump_color == trick.high_card.color:
+            return [c for c in card_pool if (c.color == trick.trump_color and c.value > trick.high_card.value)]
+        # a true base color trick
+        else:
+            return [c for c in card_pool if (trick.base_color == c.color and c.value > trick.high_card.value)
+                    or c.color == trick.trump_color]
+    else:
+        return card_pool
 
 
-def contains_pair(cards, col) -> bool:
-    return any(card.color == col and card.value == "K" for card in cards) and any(card.color == col and card.value == "O" for card in cards)
+def contains_col_pair(cards: list[Card], col: Color) -> bool:
+    """Checks cards for the pair of specified Color"""
+    return any(c.color == col and c.value == Value.Koenig for c in cards) and any(
+        c.color == col and c.value == Value.Ober for c in cards)
 
 
-def contains_half(cards, col) -> bool:
-    return any(card.color == col and (card.value == "K" or card.value == "O") for card in cards)
+def contains_col_half(cards: list[Card], col: Color) -> bool:
+    """Checks cards for one half of pair of specified Color"""
+    return any(card.color == col and (card.value == Value.Koenig or card.value == Value.Ober) for card in cards)
 
 
-def sorted_cards(cards) -> list:
-    return sorted(cards, key=lambda card: (Card.COLORS.index(card.color), Card.VALUES.index(card.value)))
+def sorted_cards(cards: list[Card]) -> list[Card]:
+    return sorted(cards, key=lambda card: (card.color, card.value))
 
 
-def all_color_cards(col):
+def all_color_cards(col: Color) -> list[Card]:
     """Returns all cards with given color."""
-    return [Card(col, v) for v in Card.VALUES]
+    return [Card(col, v) for v in Value]
 
 
-def all_value_cards(value):
+def all_value_cards(value: Value) -> list[Card]:
     """Returns all cards with given type."""
-    return [Card(c, value) for c in Card.COLORS]
+    return [Card(c, value) for c in Color]
 
 
-def card_str(card, fancy=True) -> str:
-    return text_format[card.color] + str(card) + text_format["end"] if fancy else str(card)
+def card_str(card: Card, fancy=True) -> str:
+    return text_format[str(card.color)] + str(card) + text_format["end"] if fancy else str(card)
 
 
-def cards_str(cards, fancy=True) -> str:
+def cards_str(cards: list[Card], fancy=True) -> str:
     return " ".join([card_str(card, fancy=fancy) for card in cards])
 
 
-def color_str(col, fancy=True) -> str:
-    return text_format[col] + Card.COLOR_NAMES[col] + text_format["end"] if fancy else Card.COLOR_NAMES[col]
+def color_str(col: Color, fancy=True) -> str:
+    return text_format[str(col)] + col.fancy_name() + text_format["end"] if fancy else col.fancy_name
 
 
-def bold_str(s, fancy=True) -> str:
+def bold_str(s: str, fancy=True) -> str:
     return text_format["bold"] + s + text_format["end"] if fancy else s
-
-
-# COLORS = [c for c in "rseg"]
-# VALUES = [v for v in "AZKOU9876"]
-# CARDS = [c + "-" + v for c in COLORS for v in VALUES]
-#
-#
-# COLOR_NAMES = {c: name for c, name in zip(
-#     "rseg", ["Rot", "Schell", "Eichel", "Grün"])}
-#
-#
-#
-#
-# def allowed_general(trick, cards, sup_col=None, first=False) -> list:
-#     if len(trick) == 0 and first:
-#         return allowed_first(cards)
-#     if not trick:
-#         return cards
-#     trick_col = trick[0][0]
-#     if first:
-#         # check for ace
-#         if (ace := f"{trick_col}-A") in cards:
-#             return [ace]
-#
-#     if not (allowed:=[c for c in cards if c[0] == trick_col]):
-#         allowed = [c for c in cards if c[0] == sup_col]
-#     if (b:=list(filter(lambda card: card == high_card(trick+[card], sup_col=sup_col), allowed))):
-#         allowed = b
-#     return allowed if allowed else cards
-#
-#
-# def high_card(cards, sup_col="") -> str:
-#     """Finds highest card in single trick."""
-#     if not cards:
-#         return None
-#     col = cards[0][0]
-#     base_col_cards = [card for card in cards if card[0] == col]
-#     sup_col_cards = [card for card in cards if card[0] == sup_col]
-#     return sup_col_cards[-1] if sup_col_cards else base_col_cards[-1]
-#     """#!! also not really nice, there has to be a cleaner way but
-#     for c in cards:
-#         if c[0] == col and higher_value(high, c):
-#             high = c
-#     sup_high = high_card([c for c in cards if c[0] == sup_col]
-#                          ) if sup_col != "" and sup_col != col else None
-#     return sup_high if not sup_high is None else high"""
-#
-#
-# def higher_value(base, card) -> bool:
-#     """Returns True if card has higher value than base."""
-#     for val in VALUES:
-#         if base[2] == val:
-#             return False
-#         if card[2] == val:
-#             return True
-#
-#
-# def higher_cards(base, sup_col='', pool=CARDS) -> list:
-#     """Returns all cards out of the pool that would win a trick over base as high card."""
-#     if not sup_col:
-#         return [card for card in pool if higher_value(base, card) and base[0] == card[0]]
-#     return [card for card in pool if (higher_value(base, card) and base[0] == card[0]) or (card[0] == sup_col)]
-#
-#
-# def contains_pair(cards, col) -> bool:
-#     return f"{col}-K" in cards and f"{col}-O" in cards
-#
-#
-# def contains_half(cards, col) -> bool:
-#     return f"{col}-K" in cards or f"{col}-O" in cards
-#
-#
-# def sorted_cards(cards) -> list:
-#     return [card for card in CARDS if card in set(cards)]
-#     return cards
-#
-#
-# def all_color_cards(col):
-#     """Returns all cards with given color."""
-#     return [f"{col}-{v}" for v in VALUES]
-#
-#
-# def all_value_cards(value):
-#     """Returns all cards with given type."""
-#     return [f"{c}-{value}" for c in COLORS]
-#
-#
-# def card_str(card, fancy=True) -> str:
-#     return text_format[card[0]] + card + text_format["end"] if fancy else card
-#
-#
-# def cards_str(cards, fancy=True) -> str:
-#     return " ".join([card_str(card, fancy=fancy) for card in cards])
-#
-#
-# def color_str(col, fancy=True) -> str:
-#     return text_format[col] + COLOR_NAMES[col] + text_format["end"] if fancy else COLOR_NAMES[col]
-#
-#
-# def bold_str(s, fancy=True) -> str:
-#     return text_format["bold"] + s + text_format["end"] if fancy else s
