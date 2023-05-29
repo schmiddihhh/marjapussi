@@ -4,6 +4,7 @@ from marjapussi.action import Action
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
+from marjapussi.concept import Concept
 from marjapussi.utils import contains_col_pair, contains_col_half
 import numpy as np
 
@@ -21,12 +22,12 @@ class ProbabilisticPolicy(Policy):
         self.their_score = 0
         self.round = 1
 
-    def game_start(self, state: GameState, scores: [int,int] = None, total_rounds: int = 8):
+    def game_start(self, state: GameState, scores: [int, int] = None, total_rounds: int = 8):
         super().game_start(state)
         """initializes the Policy to be ready for next game"""
         if not scores:
-            scores = [0,0]
-        self.players = [PolicyPlayer(i, state.all_players[i], scores[i%2]) for i in range(0,4)]
+            scores = [0, 0]
+        self.players = [PolicyPlayer(i, state.all_players[i], scores[i % 2]) for i in range(0, 4)]
 
         self.game_rules.total_rounds = total_rounds
         self.prov_base = self.game_rules.start_game_value
@@ -51,9 +52,9 @@ class ProbabilisticPolicy(Policy):
         partner_num = self.players[player_num].partner_number
         partner_steps = self.players[partner_num].provoking_history_steps
         player_name = self.players[player_num].name
-        #interpreting first steps:
+        # interpreting first steps:
         if len(self.players[player_num].provoking_history_steps) == 1:
-        # interpreting if the first step was a 5 increase
+            # interpreting if the first step was a 5 increase
             match player_steps[0]:
                 case 5:
                     if value < 140:
@@ -61,15 +62,19 @@ class ProbabilisticPolicy(Policy):
                             # we are dealing likely with an ace
                             # TODO lookup the probabilities instead of just the possibilities
                             if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
-                                self.players[player_num].concept_probabilities["has_ace"] = 1
+                                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                                           {"player": player_name, "info_type": "ace"}, value = 1))
                                 # TODO add probabilities to the Ace cards that we don't know about yet for that player
                             else:
-                                self.players[player_num].concept_probabilities["faking_ace"] = 1
+                                state.concepts.add(Concept(f"{player_name}_is_faking_ace",
+                                                           {"player": player_name, "info_type": "ace"}, value=1))
                         elif partner_steps and partner_steps[0] == 5:
                             # the partner already announced an ace, so we assume it must be something else
-                            self.players[player_num].concept_probabilities["some halves"] = 1
+                            state.concepts.add(Concept(f"{player_name}_has_halves",
+                                                       {"player": player_name, "info_type": "halves"}, value=1))
                     elif value == 140:
                         # value 140 might mean anything, especially if its just a 5, but we could add some probability
+
                         pass
                     else:
                         pass
@@ -112,7 +117,14 @@ class ProbabilisticPolicy(Policy):
         check for pairs, halves, and any cards that might be worth something
         For now we ll just focus on aces, tens and pairs and halves as well as the number of cards for each suite
         """
+        # TODO
         hand_cards = state.secure_cards
+        # arbitrary hand score, for our own sake ^^ we will keep track of how good we stand
+        hand_score = 0
+
+        # first we need to check for aces
+        standing_cards_count = len()
+
 
     def _calculate_possible_card_probabilities(self, state: GameState):
         """
@@ -121,6 +133,26 @@ class ProbabilisticPolicy(Policy):
         values for possible cards each player has and which cards we know securely (for those the probability is 1)
         """
         # TODO
+
+    def _estimate_provoking_max(self, state):
+        """
+        We can estimate that the maximum we can reach is somewhere below the combination of
+        - standing cards we have as a team
+        - pairs each of us has
+        - pairs we can combine
+        """
+        # TODO
+        pass
+
+    def _plan_game(self, state):
+        """
+        This method is only for the playing player!
+        Planning the moves ahead to not loose the game to the opponents team.
+        We need to watch out for getting as many tricks as possible but also to destroy their abilities
+        to swap the trump color
+        """
+        # TODO
+        pass
 
     def select_action(self, state: GameState, legal_actions: list[Action]) -> Action:
         # select an action based on the current state and legal actions
@@ -132,8 +164,8 @@ class ProbabilisticPolicy(Policy):
         game_phase = legal_actions[0].phase
         match game_phase:
             case 'PROV':
-                max_value = legal_actions[-1].content
-                self.provoking(state, state.provoking_history, max_value)
+                cur_value = legal_actions[-1].content
+                self.provoking(state, cur_value)
             case _:
                 # calculates evaluation values for each action
                 action_evaluations = []
@@ -144,7 +176,7 @@ class ProbabilisticPolicy(Policy):
                 normal_eval = [p / sum(action_evaluations) for p in action_evaluations]
                 return normal_eval
 
-    def provoking(self, state: GameState, max_value: int):
+    def provoking(self, state: GameState, cur_value: int):
         """
         implement provoking logic:
         - try to go high and not let other provoke if you have a very good hand, that means big pairs and aces
@@ -156,12 +188,10 @@ class ProbabilisticPolicy(Policy):
         - provoke 10 for 3 halves (Koenig, or Ober) or a small pair
         - provoke 15 for a big pair
         """
+        provoking_history = state.provoking_history
+        # we want an optimistic estimate of what we could reach
+        estimated_max = self._estimate_provoking_max(state)
 
-
-        # Check if we have a very good hand
-        if self._calculate_concept_probabilities(state, 'i have very good cards') and provoking_history[-1].content < 150:
-            # make a high call like go right to 150 or sth like that
-            return 150
 
         # Check if we are at risk of getting skunked
         if self._calculate_concept_probabilities(state, 'we are getting skunked'):
@@ -171,22 +201,27 @@ class ProbabilisticPolicy(Policy):
                 return 180
             elif max_value < 200:
                 return 200
+        elif cur_value < estimated_max:
+            # Check if we have a very good hand
+            if self._calculate_concept_probabilities(state, 'i have very good cards'):
+                if cur_value < 120:  # if we move first, let them not exchange information
+                    return 140
 
-        # Check if we have a pair of enough value
-        if self.has_valuable_pair():
-            if max_value < 140:
-                return max_value + 5
+            # Check if we have a pair of enough value
+            if self.has_valuable_pair():
+                if max_value < 140:
+                    return max_value + 5
 
-        # Default provoking values
-        if self.has_ace() and not self.partner_has_indicated_ace(provoking_history):
-            return 5
-        elif self.has_three_halves_or_small_pair():
-            return 10
-        elif self.has_big_pair():
-            return 15
+            # Default provoking values
+            if self.has_ace() and not self.partner_has_indicated_ace(provoking_history):
+                return 5
+            elif self.has_three_halves_or_small_pair():
+                return 10
+            elif self.has_big_pair():
+                return 15
 
-        # If none of the above conditions are met, provoke with the current max_value
-        return max_value
+            # If none of the above conditions are met, provoke with the current max_value
+            return max_value
 
     def evaluate_action(self, state: GameState, action: Action):
         # evaluate the probable success of an action, this is where the knowledge of the game should be used

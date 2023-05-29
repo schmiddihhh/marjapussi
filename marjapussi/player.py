@@ -47,5 +47,6 @@ class Player():
     def set_next_player(self, next_player) -> None:
         self.next_player: Player = next_player
 
+    @property
     def player_info(self) -> dict:
         return {'name': self.name, 'cards': self.cards}

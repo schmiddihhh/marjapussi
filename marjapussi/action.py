@@ -1,5 +1,4 @@
-from card import Card, Color
-from enum import Enum
+from marjapussi.card import Card, Color
 
 
 class Talk:

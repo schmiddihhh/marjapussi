@@ -4,6 +4,7 @@ from marjapussi.trick import Trick
 text_format = {"r": "\033[91m", "s": "\033[93m", "e": "\033[96m", "g": "\033[92m",
                "end": "\033[0m", "bold": "\033[1m", "uline": "\033[4m"}
 
+faculties
 
 def allowed_first(cards: list[Card]) -> list[Card]:
     """Filters cards by allowed first: First player has to play an ace, green or any card."""
@@ -98,3 +99,9 @@ def color_str(col: Color, fancy=True) -> str:
 
 def bold_str(s: str, fancy=True) -> str:
     return text_format["bold"] + s + text_format["end"] if fancy else s
+
+
+def _calculate_set_probability(possible_sets: list[set[Card]], set_sizes: list[int],
+                               test_set: set[Card], target_set: int) -> float:
+    # TODO: insert set calculations (thanks for helping with this part Andreas Berger aka Wurzelfreak)
+    pass

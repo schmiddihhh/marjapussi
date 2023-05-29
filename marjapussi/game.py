@@ -3,7 +3,7 @@ import marjapussi.utils as utils
 from marjapussi.player import Player
 from marjapussi.card import Card, Deck, Color
 from marjapussi.action import Action, Talk
-from trick import Trick
+from marjapussi.trick import Trick
 
 import logging
 logging.basicConfig(format='%(levelname)s: %(message)s')
@@ -19,7 +19,7 @@ class MarjaPussi():
         "start_phase": "PROV",
     }
 
-    def __init__(self, player_names: list[str], override_rules=None, log= True, fancy=True, language=1) -> None:
+    def __init__(self, player_names: list[str], override_rules =None, log= True, fancy=True, language=1) -> None:
         # init logger
         self.logger = logging.getLogger("single_game_logger")
         if log:
@@ -53,7 +53,7 @@ class MarjaPussi():
             self.players[i].set_partner(self.players[(i+2) % 4])
             self.players[i].set_next_player(self.players[(i+1) % 4])
 
-        self.original_cards = {p.name: [card.__repr__() for card in p.cards] for p in self.players}  # Change this line
+        self.original_cards = {p.name: [card for card in p.cards] for p in self.players}  # Change this line
         self.player_at_turn: Player = self.players[0]
         self.playing_player: Player | None = None
         self.game_value = self.rules["start_game_value"]

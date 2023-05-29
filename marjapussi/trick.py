@@ -18,21 +18,18 @@ class Trick:
         """
         Adds a card to the trick and updates information about the trick like the highest card or the base color
         """
-        if isinstance(card, Card):
-            if self.get_status() < 4:
-                self.cards.append(card)
-                self.high_card = self._high_card()
-                self.high_card_idx = self._high_card_idx()
-                if self.get_status() == 1:
-                    self.base_color = self.cards[0].color
-                    self.starting_player_num = player_num
-            else:
-                raise ValueError("Too many cards for one trick")
+        if self._is_valid_play():
+            self.cards.append(card)
+            self.high_card = self._high_card()
+            self.high_card_idx = self._high_card_idx()
+            if self.get_status() == 1:
+                self.base_color = self.cards[0].color
+                self.starting_player_num = player_num
         else:
-            print(f"Type of value: {type(card)} which is {card}")
-            print(type(card.value))
-            print(type(card.color))
-            raise TypeError("Invalid card type. Expected an instance of the Card class.")
+            raise ValueError("Too many cards for one trick")
+
+    def _is_valid_play(self):
+        return self.get_status() < 4
 
     def get_status(self) -> int:
         """

@@ -1,8 +1,7 @@
 from marjapussi.game import MarjaPussi
-from marjapussi.policy import Policy, RandomPolicy
-from marjapussi.utils import Card, all_color_cards, all_value_cards, higher_cards, sorted_cards, Color, Value, Deck
+from marjapussi.policy import Policy
+from marjapussi.utils import Card, sorted_cards
 from marjapussi.action import Action, Talk
-from marjapussi.trick import Trick
 from marjapussi.gamestate import GameState
 
 from tqdm import trange
@@ -13,7 +12,6 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 
 class Agent:
     """Implements an agent able to play Marjapussi."""
-
     def __init__(self, name: str, all_players: list[str], policy: Policy, start_cards: list[Card], log=False) -> None:
         self.name = name
         self.all_players = all_players
@@ -39,7 +37,6 @@ class Agent:
         Updates the players knowledge about possible and secure cards solely based on the game rules
         This is done after any Action is called out
         """
-
         # simplify variable names for current context
         player_num = action.player_number
         partner_num = (player_num + 2) % 4
@@ -54,7 +51,8 @@ class Agent:
                 card_pass = action.content
                 if action.phase == 'PASS':
                     self.state.playing_party = [player_num, partner_num]
-                self.state.pass_card(card_pass, player_name, player_num, partner_num)
+                if self.state.player_num in self.state.playing_party:
+                    self.state.pass_card(card_pass, player_name, player_num, partner_num)
 
             case 'QUES':
                 question: Talk = action.content
@@ -83,7 +81,7 @@ class Agent:
 
     def _print_state(self):
         print(f"State of {str(self)}:")
-        print(f"cards: {', '.join(str(card) for card in self.state.cards)}")
+        print(f"cards: {', '.join(str(card) for card in self.state.secure_cards)}")
         print(f"points: {self.state.points}")
         print(f"playing_player: {self.state.playing_player}")
         print(f"possible cards:")
@@ -93,40 +91,6 @@ class Agent:
         for p, cards in self.state.secure_cards.items():
             print(f"{p}:\t {', '.join(str(card) for card in sorted_cards(cards))}")
         print(self.state)
-
-    def _standing_cards(self, possible: dict, player_hand: list, trump_suit='') -> list:
-        """Returns all cards with which player_name could possibly win a trick."""
-        standing_cards = []
-
-        # If there's a trump suit, only the highest trump cards in hand are standing
-        if trump_suit:
-            trump_cards_in_hand = [card for card in player_hand if card.suit == trump_suit]
-            if trump_cards_in_hand:
-                highest_trump = max(trump_cards_in_hand, key=lambda card: card.rank)
-                standing_cards.append(highest_trump)
-            return standing_cards  # return early as no other cards can be standing
-
-        # If no trump, check each suit in hand
-        for suit in set(card.suit for card in player_hand):
-            # Only consider cards in hand of this suit
-            cards_in_hand = [card for card in player_hand if card.suit == suit]
-            # Possible cards of this suit in the game
-            possible_cards = possible.get(suit, [])
-
-            # The highest card of the suit in hand that hasn't been played yet is standing
-            highest_in_hand = max(cards_in_hand, key=lambda card: card.rank)
-            if possible_cards:
-                highest_possible = max(possible_cards, key=lambda card: card.rank)
-                if highest_in_hand.rank >= highest_possible.rank:
-                    standing_cards.append(highest_in_hand)
-
-            # If there are fewer possible cards of this suit than in hand, all additional cards in hand are standing
-            if len(cards_in_hand) > len(possible_cards):
-                additional_cards = sorted(cards_in_hand, key=lambda card: card.rank, reverse=True)[
-                                   :len(cards_in_hand) - len(possible_cards)]
-                standing_cards.extend(additional_cards)
-
-        return standing_cards
 
 
 def test_agents(policy_a: Policy, policy_b: Policy, log_agent=False, log_game=False,
@@ -143,7 +107,7 @@ def test_agents(policy_a: Policy, policy_b: Policy, log_agent=False, log_game=Fa
     for _ in trange(rounds, leave=False):
         test_game = MarjaPussi(players, log=log_game, fancy=True, override_rules=custom_rules)
         agents = {player.name: Agent(player.name, [p.name for p in test_game.players],
-                                           policy_a if int(player.name) % 2 == 0 else policy_b, player.cards, log=log_agent)
+                                     policy_a if int(player.name) % 2 == 0 else policy_b, player.cards, log=log_agent)
                   for player in test_game.players}
 
         while test_game.phase != "DONE":

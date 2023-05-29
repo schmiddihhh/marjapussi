@@ -55,29 +55,21 @@ class Value(Enum):
 class Card:
     """A generalized Card class"""
     def __init__(self, color: Color | str, value: Value | str):
-        if isinstance(color, str):
-            try:
-                color = Color(color)
-            except ValueError:
-                raise ValueError("Invalid color value.")
-        elif isinstance(color, Color):
-            pass
-        else:
-            raise TypeError("Invalid color type. Expected an instance of Color or a string.")
+        self.color: Color = self._validate_and_convert(color, Color, "color")
+        self.value: Value = self._validate_and_convert(value, Value, "value")
 
+    @staticmethod
+    def _validate_and_convert(value, enum_class, attribute_name):
         if isinstance(value, str):
             try:
-                value = Value(value)
+                return enum_class(value)
             except ValueError:
-                raise ValueError("Invalid value.")
-        elif isinstance(value, Value):
-            pass
+                raise ValueError(f"Invalid {attribute_name} value.")
+        elif isinstance(value, enum_class):
+            return value
         else:
-            print(f"Type of value: {type(value)} which is {value}")
-            raise TypeError("Invalid value type. Expected an instance of Value or a string.")
-
-        self.color: Color = color
-        self.value: Value = value
+            raise TypeError(f"Invalid {attribute_name} "
+                            f"type. Expected an instance of {enum_class.__name__} or a string.")
 
     def __str__(self) -> str:
         return f"{self.color}-{self.value}"
@@ -92,14 +84,8 @@ class Card:
 class Deck:
     """A Deck, that by being populated consists of all possible cards there is"""
     def __init__(self):
-        self.cards = []
-        self.populate()
-
-    def populate(self):
-        for color in Color:
-            for value in Value:
-                card = Card(color, value)
-                self.cards.append(card)
+        self.cards = [Card(color, value) for color in Color for value in Value]
 
     def __str__(self):
         return ", ".join(str(card) for card in self.cards)
+
