@@ -1,7 +1,7 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
 from marjapussi.action import Talk, Action
-from marjapussi.utils import higher_cards, all_color_cards, all_value_cards
+from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite
 from marjapussi.concept import Concept, ConceptStore
 
 
@@ -211,20 +211,17 @@ class GameState:
             else:
                 updated = False
 
-    def _standing_cards(self, player_name: str = None, trump_suit='') -> list:
-        """Returns all cards with which the player who owns this state could possibly win a trick."""
+    def _standing_cards(self, player_name: str = None, trump: Color = '') -> set[Card]:
+        """Returns all cards for the player_name which can or could win the trick."""
         standing_cards = []
         if player_name is None:
             player_name = self.name
 
-        player_hand = self.secure_cards[player_name]
+        potential_player_hand = self.secure_cards[player_name] | self.possible_cards[player_name]
         # If there's a trump suit, only the highest trump cards in hand are standing
-        if trump_suit:
-            trump_cards_in_hand = [card for card in player_hand if card.suit == trump_suit]
-            if trump_cards_in_hand:
-                highest_trump = max(trump_cards_in_hand, key=lambda card: card.rank)
-                standing_cards.append(highest_trump)
-            return standing_cards  # return early as no other cards can be standing
+        if trump:
+            trump_cards_in_hand = [card for card in potential_player_hand if card.suit == trump]
+            return standing_in_suite(self.cards_left, trump, potential_player_hand)
 
         # If no trump, check each suit in hand
         for suit in set(card.suit for card in player_hand):

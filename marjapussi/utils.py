@@ -105,3 +105,22 @@ def _calculate_set_probability(possible_sets: list[set[Card]], set_sizes: list[i
                                test_set: set[Card], target_set: int) -> float:
     # TODO: insert set calculations (thanks for helping with this part Andreas Berger aka Wurzelfreak)
     pass
+
+
+def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: set[Card]) -> set[Card]:
+    """returns all cards of color that are standing in the possible_cards belonging to the player with player_num"""
+    # first, we need to sort the cards of the color we want to check
+    col_cards = sorted_cards([card for card in possible_cards if card.color == color])
+    col_cards.reverse()
+    all_col_cards_left = sorted_cards([card for card in leftover_cards if card.color == color])
+    all_col_cards_left.reverse()
+    standing = []
+    for card in col_cards:
+        stand_nr = len(standing)
+        no_higher_zone = all_col_cards_left[stand_nr:(2*stand_nr+1)]
+        if card in no_higher_zone:
+            standing.append(card)
+        else:
+            break
+
+    return set(standing)
