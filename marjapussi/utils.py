@@ -1,5 +1,6 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
+from itertools import combinations
 import math
 
 text_format = {"r": "\033[91m", "s": "\033[93m", "e": "\033[96m", "g": "\033[92m",
@@ -182,3 +183,54 @@ def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: s
                 break
 
     return set(standing)
+
+
+def gruen_pair() -> set[Card]:
+    return {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+
+
+def eichel_pair() -> set[Card]:
+    return {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+
+
+def schell_pair() -> set[Card]:
+    return {Card(Color.Schell, Value.Koenig), Card(Color.Schell, Value.Ober)}
+
+
+def rot_pair() -> set[Card]:
+    return {Card(Color.Schell, Value.Koenig), Card(Color.Schell, Value.Ober)}
+
+
+def small_pair() -> set[Card]:
+    return gruen_pair() | eichel_pair()
+
+
+def big_pair() -> set[Card]:
+    return schell_pair() | rot_pair()
+
+
+def pair() -> set[Card]:
+    return small_pair() | big_pair()
+
+
+def generate_subsets(set_elements: set, subset_size: int) -> list[set]:
+    subsets = []
+    for subset in combinations(set_elements, subset_size):
+        subsets.add(set(subset))
+    return subsets
+
+
+def small_halves() -> list[set[Card]]:
+    return [subset for subset in generate_subsets(small_pair(), 2) if subset not in [gruen_pair(), eichel_pair()]]
+
+
+def big_halves() -> list[set[Card]]:
+    return [subset for subset in generate_subsets(big_pair(), 2) if subset not in [schell_pair(), rot_pair()]]
+
+
+def three_halves() -> list[set[Card]]:
+    all_3_halves = generate_subsets(pair(), 3)
+    pairs = [gruen_pair(), eichel_pair(), schell_pair(), rot_pair()]
+    return [subset for subset in all_3_halves if not any(p.issubset(subset) for p in pairs)]
+
+

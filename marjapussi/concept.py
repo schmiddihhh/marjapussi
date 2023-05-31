@@ -14,7 +14,7 @@ class Concept:
             self.weights = [1.] * len(dependencies)
         elif len(dependencies) != len(weights):
             raise ValueError("The dependencies and weights must be of the same length.")
-        # TODO Check if dependency is self dependant and rais error
+        # TODO Check if dependency is self dependant and raise error
 
     @property
     def name(self):

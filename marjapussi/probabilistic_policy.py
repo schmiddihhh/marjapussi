@@ -103,9 +103,12 @@ class ProbabilisticPolicy(Policy):
                 # we are dealing somewhat likely with no ace
                 state.concepts.add(Concept(f"{player_name}_has_ace",
                                            {"player": player_name, "info_type": "ace"}, value=0.1))
-            # TODO calculate the probabilities of the 10 being a small pair or 3+ halves
+            # TODO calculate the probabilities of the 10 being a small pair or 3+ halves instead of arbitrary numbers
+
+
+
             # For that we would need combinatorial util functions that produce all possible combinations
-            # For now we just check our own cards and the other players announcements
+            # For now we just check our own cards
             if (gruen_pair.issubset(state.possible_cards[player_name]) and
                     eichel_pair.issubset(state.possible_cards[player_name])):
                 state.concepts.add(Concept(f"{player_name}_has_small_pair",
@@ -127,7 +130,7 @@ class ProbabilisticPolicy(Policy):
                                            {"player": player_name, "info_type": "pair"}, value=1.))
         else:
             # this is likely a small pair, as otherwise the player wouldn't go over.
-            # For now we just check our own cards and the other players announcements
+            # For now we just check our own cards
             if (gruen_pair.issubset(state.possible_cards[player_name]) and
                     eichel_pair.issubset(state.possible_cards[player_name])):
                 state.concepts.add(Concept(f"{player_name}_has_small_pair",
