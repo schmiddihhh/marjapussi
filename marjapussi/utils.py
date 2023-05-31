@@ -1,10 +1,10 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
+import math
 
 text_format = {"r": "\033[91m", "s": "\033[93m", "e": "\033[96m", "g": "\033[92m",
                "end": "\033[0m", "bold": "\033[1m", "uline": "\033[4m"}
 
-faculties
 
 def allowed_first(cards: list[Card]) -> list[Card]:
     """Filters cards by allowed first: First player has to play an ace, green or any card."""
@@ -101,10 +101,61 @@ def bold_str(s: str, fancy=True) -> str:
     return text_format["bold"] + s + text_format["end"] if fancy else s
 
 
-def _calculate_set_probability(possible_sets: list[set[Card]], set_sizes: list[int],
-                               test_set: set[Card], target_set: int) -> float:
-    # TODO: insert set calculations (thanks for helping with this part Andreas Berger aka Wurzelfreak)
-    pass
+def _calc_sets_possibilities(x: list[int], v: list[int]) -> int:
+    """
+    x: list of set sizes
+    v: list of restriction set sizes
+    """
+    n = sum(x)
+    v_fact_multi = math.prod([math.factorial(vx) for vx in v])
+    binomial_sum = 0
+    for i in range(v[0]):
+        for j in range(v[1]):
+            binomial_sum += math.comb(x[1] + x[2], v[0]) * \
+                         math.comb(x[0] + x[2] - j, v[1]) * \
+                         math.comb(x[0] + x[1] - v[0] + j - i, v[2])
+    return math.factorial(n - sum(v)) * v_fact_multi * binomial_sum
+
+
+def calculate_set_in_3set_probability(possible_sets: list[set[Card]], set_sizes: list[int],
+                                      test_set: set[Card], target_set: int) -> float:
+    """
+    we calculate the probability, that the test_set is in the possible_sets with index target_set
+    with the given set_sizes, thanks Andreas for helping out with this!
+    maybe we could also make this function work for an arbitrary amount of sets other than 3 later if necessary
+    """
+    union_set = set()
+    total_card_amount = len(union_set)
+    assert total_card_amount == sum(set_sizes), "the total amount of possible cards needs to exactly fit in the sets"
+    assert len(possible_sets) == 3, "this function only works for 3 sets at a time"
+    assert len(set_sizes) == 3, "this functions inputs need to match length, which is the amount of sets that is 3"
+    assert target_set in range(3), "the target set needs to be an index within range of the provided sets! 0, 1 or 2"
+
+    for poss_set in possible_sets:
+        union_set |= poss_set
+    diff_sets = [union_set.difference(poss_set) for poss_set in possible_sets]
+
+    # Let's first rule out the problem cases:
+    if not test_set.issubset(possible_sets[target_set]):
+        return 0.
+    if len(test_set) > set_sizes[target_set]:
+        return 0.
+
+    # first we calculate the possible configurations for the restrictions each set has
+    v = [len(diff_set) for diff_set in diff_sets]
+    x = set_sizes
+    set_possibilities = _calc_sets_possibilities(x, v)
+
+    # Now we calculate the possibilities, if we already distributed the test_set
+    test_set_possible_distribs = math.comb(x[target_set], len(test_set))
+    new_union_set = union_set.difference(test_set)
+    x[target_set] -= len(test_set)
+    new_poss_sets = [poss_set.difference(test_set) for poss_set in possible_sets]
+    new_diff_sets = [new_union_set.difference(poss_set) for poss_set in new_poss_sets]
+    v = [len(diff_set) for diff_set in new_diff_sets]
+    set_possibilities_restrict = test_set_possible_distribs * _calc_sets_possibilities(x, v)
+
+    return set_possibilities_restrict / set_possibilities
 
 
 def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: set[Card]) -> set[Card]:
@@ -114,13 +165,20 @@ def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: s
     col_cards.reverse()
     all_col_cards_left = sorted_cards([card for card in leftover_cards if card.color == color])
     all_col_cards_left.reverse()
+    majority = len(col_cards) >= len(all_col_cards_left)/2
     standing = []
     for card in col_cards:
         stand_nr = len(standing)
-        no_higher_zone = all_col_cards_left[stand_nr:(2*stand_nr+1)]
-        if card in no_higher_zone:
-            standing.append(card)
+        if not majority:
+            if card == all_col_cards_left[stand_nr]:
+                standing.append(card)
+            else:
+                break
         else:
-            break
+            no_higher_zone = all_col_cards_left[stand_nr:(2*stand_nr+1)]
+            if card in no_higher_zone:
+                standing.append(card)
+            else:
+                break
 
     return set(standing)

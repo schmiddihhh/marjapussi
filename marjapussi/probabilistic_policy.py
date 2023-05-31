@@ -1,3 +1,5 @@
+import math
+
 from marjapussi.policy import Policy
 from marjapussi.gamestate import GameState
 from marjapussi.action import Action
@@ -5,7 +7,7 @@ from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
 from marjapussi.concept import Concept
-from marjapussi.utils import contains_col_pair, contains_col_half
+from marjapussi.utils import contains_col_pair, contains_col_half, calculate_set_in_3set_probability
 import numpy as np
 
 
@@ -17,6 +19,9 @@ class ProbabilisticPolicy(Policy):
 
         self.game_rules = GameRules()
         self.prov_base = 115
+
+        self.max_reach_value = 0
+        self.max_opponent_reach_value = 420
 
         self.our_score = 0
         self.their_score = 0
@@ -41,7 +46,7 @@ class ProbabilisticPolicy(Policy):
         self._assess_own_hand(state)
 
     @staticmethod
-    def _interpret_first_5_provoke(state: GameState, partner_steps, player_name, value) -> None:
+    def _interpret_first_5_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
         """
         Information is saved inside the GameState object that the function adds concepts and information on to
         """
@@ -51,15 +56,16 @@ class ProbabilisticPolicy(Policy):
                 # TODO lookup the probabilities instead of just the possibilities
                 if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
                     state.concepts.add(Concept(f"{player_name}_has_ace",
-                                               {"player": player_name, "info_type": "ace"}, value=1))
+                                               {"player": player_name, "info_type": "ace"}, value=1.))
                     # TODO add probabilities to the Ace cards that we don't know about yet for that player
                 else:
                     state.concepts.add(Concept(f"{player_name}_is_faking_ace",
-                                               {"player": player_name, "info_type": "ace"}, value=1))
+                                               {"player": player_name, "info_type": "ace"}, value=1.))
             elif partner_steps and partner_steps[0] == 5:
-                # the partner already announced an ace, so we assume it must be something else or another ace
+                # the partner already announced an ace, so we assume it must be something else
+                # right now we ignore the small likelihood that he has just another ace
                 state.concepts.add(Concept(f"{player_name}_has_halves",
-                                           {"player": player_name, "info_type": "halves"}, value=1))
+                                           {"player": player_name, "info_type": "halves"}, value=1.))
         else:
             # value 140 might mean anything, especially if its just a 5, but we could add some probability
             # if the partner indicated a pair, it might just be the ace
@@ -67,7 +73,7 @@ class ProbabilisticPolicy(Policy):
             if partner_steps and partner_steps[0] == 10 or partner_steps[0] == 15 or partner_steps[0] == 20:
                 if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
                     state.concepts.add(Concept(f"{player_name}_has_ace",
-                                               {"player": player_name, "info_type": "ace"}, value=1))
+                                               {"player": player_name, "info_type": "ace"}, value=1.))
             # we need to differentiate at this point if its our partner:
             if player_name == state.partner:
                 # we might want to hit a black game, our partner needs aces and standing cards
@@ -82,6 +88,65 @@ class ProbabilisticPolicy(Policy):
                         min(skunked_concept.value + 0.3, 1)
                     # TODO make this more of a dependant property!
                 pass
+
+    @staticmethod
+    def _interpret_first_10_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
+        """
+        Information is saved inside the GameState object that the function adds concepts and information on to
+        """
+        # TODO would be great to have functions that give combiantions of halves or pairs by names.
+        # such like gruen_pair or 3 halves as sets of cards.
+        gruen_pair = {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+        eichel_pair = {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+        if value < 140:
+            if (partner_steps and partner_steps[0] != 5) or not partner_steps:
+                # we are dealing somewhat likely with no ace
+                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                           {"player": player_name, "info_type": "ace"}, value=0.1))
+            # TODO calculate the probabilities of the 10 being a small pair or 3+ halves
+            # For that we would need combinatorial util functions that produce all possible combinations
+            # For now we just check our own cards and the other players announcements
+            if (gruen_pair.issubset(state.possible_cards[player_name]) and
+                    eichel_pair.issubset(state.possible_cards[player_name])):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=0.6))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=0.6))
+            elif gruen_pair.issubset(state.possible_cards[player_name]):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=0.3))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=0.9))
+            elif eichel_pair.issubset(state.possible_cards[player_name]):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=0.3))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=0.9))
+            else:
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=1.))
+        else:
+            # this is likely a small pair, as otherwise the player wouldn't go over.
+            # For now we just check our own cards and the other players announcements
+            if (gruen_pair.issubset(state.possible_cards[player_name]) and
+                    eichel_pair.issubset(state.possible_cards[player_name])):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=1.))
+            elif gruen_pair.issubset(state.possible_cards[player_name]):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=0.7))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=0.3))
+            elif eichel_pair.issubset(state.possible_cards[player_name]):
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                           {"player": player_name, "info_type": "pair"}, value=0.9))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=0.1))
+            else:
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                           {"player": player_name, "info_type": "pair"}, value=1.))
+
+
 
     def _deduct_provoking_infos(self, state: GameState, player_num: int, value: int) -> None:
         """
@@ -107,7 +172,7 @@ class ProbabilisticPolicy(Policy):
                 case 5:
                     self._interpret_first_5_provoke(state, partner_steps, player_name, value)
                 case 10:
-                    pass
+                    self._interpret_first_10_provoke(state, partner_steps, player_name, value)
                 case 15:
                     pass
                 case 20:
@@ -144,15 +209,89 @@ class ProbabilisticPolicy(Policy):
         """
         check for pairs, halves, and any cards that might be worth something
         For now we ll just focus on aces, tens and pairs and halves as well as the number of cards for each suite
+        We yield a rough estimate for the game value we could reach with this hand alone
+        And we also yield what the opponents party could reach maximum!
+        We also give an estimation if they would play a black game on us, depending on our way to get into the
+        different suites. If we can't ensure that we could get a trick in a suite if they don't
         """
-        # TODO
-        hand_cards = state.secure_cards
+        hand_cards: set[Card] = state.secure_cards[state.name]
         # arbitrary hand score, for our own sake ^^ we will keep track of how good we stand
+
+        # TODO make dependant concepts out of these scores
+        self.max_reach_value = 140
         hand_score = 0
+        opp_estimate_max = 420
 
-        # first we need to check for aces
-        standing_cards_count = len()
+        # first we need to check for aces, add arbitrary points to our score based on that
+        aces = [card for card in hand_cards if card.value == Value.Ass]
+        if aces:
+            hand_score += 5*math.pow(2, len(aces)-1)
+            opp_estimate_max -= 11 * len(aces)
 
+        # Tens are impactful, as usually if you have another card with them, they can stop trump games
+        # However they can also ruin your chances if they are single on your hand!
+        # They also are a lot of points and likely land in your tricks if you end up taking the game!
+        hand_cards_by_suite = {}
+        tens = [card for card in hand_cards if card.value == Value.Zehn]
+        for color in Color:
+            hand_cards_by_suite[color] = [card for card in hand_cards if card.color == color]
+            if Card(color, Value.Zehn) in tens:
+                if len(hand_cards_by_suite[color]) > 1:
+                    hand_score += 10
+                else:
+                    hand_score -= 10
+
+        # Let's calculate which pairs we or the opponents might have
+        pair_value = 0
+        for color in Color:
+            if contains_col_pair(list(hand_cards), color):
+                state.concepts.add(Concept(f"{state.name}_has_{str(color)}_pair",
+                                           {"player": state.name, "info_type": "pair", "color": color},
+                                           value=1.))
+                hand_score += color.points
+                #blank pairs are not that good, additional trump however is even better!:
+                if len(hand_cards_by_suite[color]) == 2:
+                    hand_score += color.points * 3/4
+                elif len(hand_cards_by_suite[color]) == 3:
+                    hand_score += color.points
+                else:
+                    hand_score += color.points * 5/4
+                # trump aces and tens are all the more valuable!
+                if Card(color, Value.Ass) in aces:
+                    hand_score += 10
+                    if Card(color, Value.Zehn) in tens:
+                        hand_score += 10
+                else:
+                    if Card(color, Value.Zehn) in tens:
+                        hand_score += 5
+
+                self.max_reach_value += color.points
+                pair_value += color.points
+                opp_estimate_max -= color.points
+
+            elif contains_col_half(list(hand_cards), color):
+                # add some arbitrary amount for the colors for evaluation
+                hand_score += color.points/5
+                opp_estimate_max -= color.points
+            else:
+                # TODO estimate if there is anything we can deduct from having nothing?!
+                pass
+
+        # Now let's calculate roughly the value of our standing cards
+        standing_cards = state.standing_cards()
+        hand_score += sum([card.value.points for card in standing_cards])
+
+        # we fear getting played black under different circumstances
+        black_chance = (1 - hand_score/opp_estimate_max) / (len(aces) + 1)
+        if len(aces) == 4:
+            black_chance = 0
+
+        # TODO calculate pseudostanding cards like a Koenig and a Zehn together where one will likely stand
+
+        # TODO make these all depending concepts based on more basic values!
+        state.concepts.add(Concept(f"getting_played_black", {}, value=black_chance))
+        state.concepts.add(Concept(f"my_hand_value", {}, value=hand_score))
+        self.max_opponent_reach_value = opp_estimate_max
 
     def _calculate_possible_card_probabilities(self, state: GameState):
         """
@@ -231,7 +370,7 @@ class ProbabilisticPolicy(Policy):
                 return 200
         elif cur_value < estimated_max:
             # Check if we have a very good hand
-            if self._calculate_concept_probabilities(state, 'i have very good cards'):
+            if self._calculate_concept_probabilities(state, 'hand_card_value'):
                 if cur_value < 120:  # if we move first, let them not exchange information
                     return 140
 

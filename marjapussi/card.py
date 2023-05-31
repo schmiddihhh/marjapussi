@@ -24,6 +24,7 @@ class Color(Enum):
             case("e"): return "Eichel"
             case("g"): return "Grün"
 
+    @property
     def points(self):
         return CardPoints[self.name].value
 
@@ -48,6 +49,7 @@ class Value(Enum):
         order = ["6", "7", "8", "9", "U", "O", "K", "Z", "A"]
         return order.index(self.value) < order.index(other.value)
 
+    @property
     def points(self):
         return CardPoints[self.name].value
 

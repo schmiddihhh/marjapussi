@@ -215,8 +215,8 @@ class GameState:
             else:
                 updated = False
 
-    def _standing_cards(self, player_name: str = None, trump: Color = '') -> set[Card]:
-        """Returns all cards for the player_name which can or could win the trick."""
+    def standing_cards(self, player_name: str = None, trump: Color = '') -> set[Card]:
+        """Returns all cards for the player_name (by default state owner) which can or could win the trick."""
         standing_cards = set()
         if player_name is None:
             player_name = self.name
