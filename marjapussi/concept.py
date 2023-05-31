@@ -56,7 +56,7 @@ class ConceptStore:
                 if not self.dict_by_properties[prop]:
                     del self.dict_by_properties[prop]
 
-    def get_by_id(self, name: str):
+    def get_by_name(self, name: str) -> Concept | None:
         return self.dict_by_name.get(name)
 
     def get_all_by_properties(self, properties: dict) -> set[Concept]:

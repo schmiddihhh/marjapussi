@@ -40,6 +40,49 @@ class ProbabilisticPolicy(Policy):
         self._calculate_possible_card_probabilities(state)
         self._assess_own_hand(state)
 
+    @staticmethod
+    def _interpret_first_5_provoke(state: GameState, partner_steps, player_name, value) -> None:
+        """
+        Information is saved inside the GameState object that the function adds concepts and information on to
+        """
+        if value < 140:
+            if (partner_steps and partner_steps[0] != 5) or not partner_steps:
+                # we are dealing likely with an ace
+                # TODO lookup the probabilities instead of just the possibilities
+                if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
+                    state.concepts.add(Concept(f"{player_name}_has_ace",
+                                               {"player": player_name, "info_type": "ace"}, value=1))
+                    # TODO add probabilities to the Ace cards that we don't know about yet for that player
+                else:
+                    state.concepts.add(Concept(f"{player_name}_is_faking_ace",
+                                               {"player": player_name, "info_type": "ace"}, value=1))
+            elif partner_steps and partner_steps[0] == 5:
+                # the partner already announced an ace, so we assume it must be something else or another ace
+                state.concepts.add(Concept(f"{player_name}_has_halves",
+                                           {"player": player_name, "info_type": "halves"}, value=1))
+        else:
+            # value 140 might mean anything, especially if its just a 5, but we could add some probability
+            # if the partner indicated a pair, it might just be the ace
+            # TODO add case for values above 140, for now its all the same
+            if partner_steps and partner_steps[0] == 10 or partner_steps[0] == 15 or partner_steps[0] == 20:
+                if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
+                    state.concepts.add(Concept(f"{player_name}_has_ace",
+                                               {"player": player_name, "info_type": "ace"}, value=1))
+            # we need to differentiate at this point if its our partner:
+            if player_name == state.partner:
+                # we might want to hit a black game, our partner needs aces and standing cards
+                # if they win with this call, other than that we can't really guess anything
+                pass
+            else:
+                # if we are predicting that we might get played black and we have no pair indication, this might
+                # ring alarm bells even more
+                skunked_concept = state.concepts.get_by_name("getting_played_black")
+                if skunked_concept and skunked_concept.evaluate() > 0.5:
+                    state.concepts.get_by_name("getting_played_black").value = \
+                        min(skunked_concept.value + 0.3, 1)
+                    # TODO make this more of a dependant property!
+                pass
+
     def _deduct_provoking_infos(self, state: GameState, player_num: int, value: int) -> None:
         """
         We need infos about what the players are trying to communicate!
@@ -52,32 +95,17 @@ class ProbabilisticPolicy(Policy):
         partner_num = self.players[player_num].partner_number
         partner_steps = self.players[partner_num].provoking_history_steps
         player_name = self.players[player_num].name
+
+        # we don't interpret our own steps, the infos from our hand are already in the concepts
+        if state.player_num == player_num:
+            return
+
         # interpreting first steps:
         if len(self.players[player_num].provoking_history_steps) == 1:
             # interpreting if the first step was a 5 increase
             match player_steps[0]:
                 case 5:
-                    if value < 140:
-                        if (partner_steps and partner_steps[0] != 5) or not partner_steps:
-                            # we are dealing likely with an ace
-                            # TODO lookup the probabilities instead of just the possibilities
-                            if any(card.value == Value.Ass for card in state.possible_cards.get(player_name, set())):
-                                state.concepts.add(Concept(f"{player_name}_has_ace",
-                                                           {"player": player_name, "info_type": "ace"}, value = 1))
-                                # TODO add probabilities to the Ace cards that we don't know about yet for that player
-                            else:
-                                state.concepts.add(Concept(f"{player_name}_is_faking_ace",
-                                                           {"player": player_name, "info_type": "ace"}, value=1))
-                        elif partner_steps and partner_steps[0] == 5:
-                            # the partner already announced an ace, so we assume it must be something else
-                            state.concepts.add(Concept(f"{player_name}_has_halves",
-                                                       {"player": player_name, "info_type": "halves"}, value=1))
-                    elif value == 140:
-                        # value 140 might mean anything, especially if its just a 5, but we could add some probability
-
-                        pass
-                    else:
-                        pass
+                    self._interpret_first_5_provoke(state, partner_steps, player_name, value)
                 case 10:
                     pass
                 case 15:
@@ -194,7 +222,7 @@ class ProbabilisticPolicy(Policy):
 
 
         # Check if we are at risk of getting skunked
-        if self._calculate_concept_probabilities(state, 'we are getting skunked'):
+        if self._calculate_concept_probabilities(state, 'getting_played_black'):
             if max_value < 140:
                 return 140
             elif max_value < 180:

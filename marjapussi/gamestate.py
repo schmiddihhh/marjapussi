@@ -9,6 +9,7 @@ class GameState:
     def __init__(self, name: str, all_players: list[str], start_cards: list[Card]):
         self.name = name
         self.player_num = all_players.index(name)  # the player with index 0 is always first
+        self.partner = all_players[(self.player_num + 2) % 4]
         self.provoking_history: list[Action] = []
         self.game_value = 115
         self.current_trick = Trick()
@@ -18,8 +19,8 @@ class GameState:
         self.points = {player: 0 for player in all_players}
         self.possible_cards = {player: set() if player == name else set(Deck().cards).difference(start_cards)
                                for player in all_players}
-        self.possible_cards_probabilities = {player: set() if player == name else set(Deck().cards).difference(start_cards)
-                               for player in all_players}
+        self.possible_cards_probabilities = {player: set() if player == name else
+                                             set(Deck().cards).difference(start_cards) for player in all_players}
         self.secure_cards = {player: set(start_cards) if player == name else set() for player in all_players}
         self.playing_player = ''
         self.asking_status = {player: 0 for player in all_players}
@@ -27,7 +28,8 @@ class GameState:
         self.actions: list[Action] = []
         self.phase = 'PROV'
         self.cards_left = set(Deck().cards)
-        self.player_cards_left: list[int] = [int(len(self.cards_left) / len(self.all_players)) for i in range(len(self.all_players))]
+        self.player_cards_left: list[int] = [int(len(self.cards_left) / len(self.all_players)) for i in
+                                             range(len(self.all_players))]
 
     def _set_secure_card(self, card: Card, player_name: str) -> None:
         self.secure_cards[player_name].add(card)
@@ -78,8 +80,10 @@ class GameState:
 
     def ask_question(self, pronoun: str, player_name: str):
         match pronoun:
-            case "our": self.asking_status[player_name] = 2
-            case "yours": self.asking_status[player_name] = 1
+            case "our":
+                self.asking_status[player_name] = 2
+            case "yours":
+                self.asking_status[player_name] = 1
 
     def remove_possibles(self, player_name, diff_list: list[Card] | set[Card]) -> None:
         self.possible_cards[player_name] = self.possible_cards[player_name].difference(set(diff_list))
@@ -176,8 +180,8 @@ class GameState:
                                 raise ValueError(f"{player} announced a card {str(other_card)} but doesn't posses one.")
                             self._set_secure_card(Card(p_col, other_val), player)
             # check for no pair calls
-            if self.concepts.get_by_id(f"{player_name}_has_no_pair"):
-                if not self.concepts.get_by_id(f"{player_name}_has_{played_card.color}_pair"):
+            if self.concepts.get_by_name(f"{player_name}_has_no_pair"):
+                if not self.concepts.get_by_name(f"{player_name}_has_{played_card.color}_pair"):
                     self.remove_possibles(player_name, [other_card])
             # after this, the pair can't be in one hand anymore!
             self.concepts.remove(f"{player_name}_has_{played_card.color}_pair")
@@ -194,8 +198,8 @@ class GameState:
 
             for i in range(player_count):
                 # check for cards that are only possible for one player:
-                only_for_i = possible_cards[i] - possible_cards[(i+1) % 4] - \
-                             possible_cards[(i+2) % 4] - possible_cards[(i+3) % 4]
+                only_for_i = possible_cards[i] - possible_cards[(i + 1) % 4] - \
+                             possible_cards[(i + 2) % 4] - possible_cards[(i + 3) % 4]
                 if only_for_i:
                     updated = True
                     for card in only_for_i:
@@ -213,7 +217,7 @@ class GameState:
 
     def _standing_cards(self, player_name: str = None, trump: Color = '') -> set[Card]:
         """Returns all cards for the player_name which can or could win the trick."""
-        standing_cards = []
+        standing_cards = set()
         if player_name is None:
             player_name = self.name
 
@@ -224,23 +228,9 @@ class GameState:
             return standing_in_suite(self.cards_left, trump, potential_player_hand)
 
         # If no trump, check each suit in hand
-        for suit in set(card.suit for card in player_hand):
+        for suit in set(card.suit for card in potential_player_hand):
             # Only consider cards in hand of this suit
-            cards_in_hand = [card for card in player_hand if card.suit == suit]
-            # Possible cards of this suit in the game
-            possible_cards = self.possible_cards.get(suit, [])
-
-            # The highest card of the suit in hand that hasn't been played yet is standing
-            highest_in_hand = max(cards_in_hand, key=lambda card: card.rank)
-            if possible_cards:
-                highest_possible = max(possible_cards, key=lambda card: card.rank)
-                if highest_in_hand.rank >= highest_possible.rank:
-                    standing_cards.append(highest_in_hand)
-
-            # If there are fewer possible cards of this suit than in hand, all additional cards in hand are standing
-            if len(cards_in_hand) > len(possible_cards):
-                additional_cards = sorted(cards_in_hand, key=lambda card: card.rank, reverse=True)[
-                                   :len(cards_in_hand) - len(possible_cards)]
-                standing_cards.extend(additional_cards)
+            suit_hand_cards = set([card for card in potential_player_hand if card.color == suit])
+            standing_cards |= standing_in_suite(self.cards_left, suit, suit_hand_cards)
 
         return standing_cards
