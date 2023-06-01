@@ -49,6 +49,7 @@ class ProbabilisticPolicy(Policy):
     def _interpret_first_gone_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
         """
         Information is saved inside the GameState object that the function adds concepts and information on to
+        # TODO add more dpendancies to the concepts
         """
         if value < 140:
             if (not partner_steps) or partner_steps[0] == 0:
@@ -61,8 +62,17 @@ class ProbabilisticPolicy(Policy):
                                           {"player": player_name, "info_type": "pair"}, value=0.))
                 state.concepts.add(Concept(f"{player_name}_has_big_pair",
                                           {"player": player_name, "info_type": "pair"}, value=0.))
-            elif partner_steps[0] != 5:
-
+            else:
+                # this means less, but still bad cards!
+                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                          {"player": player_name, "info_type": "ace"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                          {"player": player_name, "info_type": "halves"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                          {"player": player_name, "info_type": "pair"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_big_pair",
+                                          {"player": player_name, "info_type": "pair"}, value=0.))
+                pass
 
     @staticmethod
     def _interpret_first_5_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
