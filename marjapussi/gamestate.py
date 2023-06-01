@@ -111,6 +111,7 @@ class GameState:
                 else:
                     self.concepts.add(Concept(f"{player_name}_has_{str(answer.color)}_half",
                                               {"color": answer.color, "player": player_name, "info_type": "half"}))
+        self._set_logic_check()
 
     def announce_ansage(self, ansage: Talk, player_name: str):
         pair = {Card(ansage.color, Value.Koenig), Card(ansage.color, Value.Ober)}
@@ -123,6 +124,7 @@ class GameState:
                 self.current_trick.trump_color = ansage.color
             case 'nwe':
                 self.remove_possibles(player_name, pair)
+        self._set_logic_check()
 
     def _possible_player_cards(self, player_name, trick: Trick) -> None:
         """

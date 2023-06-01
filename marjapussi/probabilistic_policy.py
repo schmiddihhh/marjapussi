@@ -7,7 +7,7 @@ from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
 from marjapussi.concept import Concept
-from marjapussi.utils import contains_col_pair, contains_col_half, calculate_set_in_3set_probability
+import marjapussi.utils as utils
 import numpy as np
 
 
@@ -44,6 +44,25 @@ class ProbabilisticPolicy(Policy):
         # already begin reasoning...
         self._calculate_possible_card_probabilities(state)
         self._assess_own_hand(state)
+
+    @staticmethod
+    def _interpret_first_gone_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
+        """
+        Information is saved inside the GameState object that the function adds concepts and information on to
+        """
+        if value < 140:
+            if (not partner_steps) or partner_steps[0] == 0:
+                # this means kinda bad cards!
+                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                          {"player": player_name, "info_type": "ace"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                          {"player": player_name, "info_type": "halves"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                          {"player": player_name, "info_type": "pair"}, value=0.))
+                state.concepts.add(Concept(f"{player_name}_has_big_pair",
+                                          {"player": player_name, "info_type": "pair"}, value=0.))
+            elif partner_steps[0] != 5:
+
 
     @staticmethod
     def _interpret_first_5_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
@@ -90,66 +109,34 @@ class ProbabilisticPolicy(Policy):
                 pass
 
     @staticmethod
-    def _interpret_first_10_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
+    def _interpret_first_10_provoke(self, state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
         """
         Information is saved inside the GameState object that the function adds concepts and information on to
         """
-        # TODO would be great to have functions that give combiantions of halves or pairs by names.
-        # such like gruen_pair or 3 halves as sets of cards.
-        gruen_pair = {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
-        eichel_pair = {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+        # Probability for small pair or three halves can be calculated, based on the probability
+        # we can more accurately tell, which one it might be, given that the player already announced
+        # that he has either one
+        small_pair_prob = utils.player_has_set_probability(state, player_name, utils.small_pairs())
+        three_halves_prob = utils.player_has_set_probability(state, player_name, utils.three_halves())
+
         if value < 140:
             if (partner_steps and partner_steps[0] != 5) or not partner_steps:
                 # we are dealing somewhat likely with no ace
                 state.concepts.add(Concept(f"{player_name}_has_ace",
                                            {"player": player_name, "info_type": "ace"}, value=0.1))
-            # TODO calculate the probabilities of the 10 being a small pair or 3+ halves instead of arbitrary numbers
-
-
-
-            # For that we would need combinatorial util functions that produce all possible combinations
-            # For now we just check our own cards
-            if (gruen_pair.issubset(state.possible_cards[player_name]) and
-                    eichel_pair.issubset(state.possible_cards[player_name])):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=0.6))
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=0.6))
-            elif gruen_pair.issubset(state.possible_cards[player_name]):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=0.3))
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=0.9))
-            elif eichel_pair.issubset(state.possible_cards[player_name]):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=0.3))
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=0.9))
-            else:
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=1.))
+            state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                       {"player": player_name, "info_type": "pair"}, value=math.sqrt(small_pair_prob)))
+            state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                       {"player": player_name, "info_type": "pair"},
+                                       value=math.sqrt(three_halves_prob)))
         else:
-            # this is likely a small pair, as otherwise the player wouldn't go over.
-            # For now we just check our own cards
-            if (gruen_pair.issubset(state.possible_cards[player_name]) and
-                    eichel_pair.issubset(state.possible_cards[player_name])):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=1.))
-            elif gruen_pair.issubset(state.possible_cards[player_name]):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=0.7))
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=0.3))
-            elif eichel_pair.issubset(state.possible_cards[player_name]):
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"}, value=0.9))
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=0.1))
-            else:
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"}, value=1.))
-
-
+            # this is likely a small pair, as otherwise the player wouldn't go over maybe.
+            state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                       {"player": player_name, "info_type": "pair"}, value=math.sqrt(small_pair_prob)))
+            # but if the partner indicated haves, it might just be a guessed step for a guessed pair
+            state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                       {"player": player_name, "info_type": "pair"},
+                                       value=three_halves_prob))
 
     def _deduct_provoking_infos(self, state: GameState, player_num: int, value: int) -> None:
         """
@@ -158,6 +145,11 @@ class ProbabilisticPolicy(Policy):
         In the Future it might be wise to not rely too much on what the opponents try to communicate
         As this way players could abuse the AI too much by feeding false information
         We will also have to assume more variety when playing with other AI policies together
+        Concepts that can be learned:
+        f"{player_name}_has_small_pair", info_type: pair
+        f"{player_name}_has_big_pair", info_type: pair
+        f"{player_name}_has_{color}_pair", info_type: pair
+        f"{player_name}_has_3+_halves"
         """
         player_steps = self.players[player_num].provoking_history_steps
         partner_num = self.players[player_num].partner_number
@@ -247,7 +239,7 @@ class ProbabilisticPolicy(Policy):
         # Let's calculate which pairs we or the opponents might have
         pair_value = 0
         for color in Color:
-            if contains_col_pair(list(hand_cards), color):
+            if utils.contains_col_pair(list(hand_cards), color):
                 state.concepts.add(Concept(f"{state.name}_has_{str(color)}_pair",
                                            {"player": state.name, "info_type": "pair", "color": color},
                                            value=1.))
@@ -272,7 +264,7 @@ class ProbabilisticPolicy(Policy):
                 pair_value += color.points
                 opp_estimate_max -= color.points
 
-            elif contains_col_half(list(hand_cards), color):
+            elif utils.contains_col_half(list(hand_cards), color):
                 # add some arbitrary amount for the colors for evaluation
                 hand_score += color.points/5
                 opp_estimate_max -= color.points

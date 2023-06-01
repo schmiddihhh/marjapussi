@@ -1,5 +1,6 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
+from marjapussi.gamestate import GameState
 from itertools import combinations
 import math
 
@@ -201,36 +202,68 @@ def rot_pair() -> set[Card]:
     return {Card(Color.Schell, Value.Koenig), Card(Color.Schell, Value.Ober)}
 
 
-def small_pair() -> set[Card]:
+def small_pairs() -> list[set[Card]]:
+    return [gruen_pair(), eichel_pair()]
+
+
+def big_pairs() -> list[set[Card]]:
+    return [schell_pair(), rot_pair()]
+
+
+def pairs() -> list[set[Card]]:
+    return [gruen_pair(), eichel_pair(), schell_pair(), rot_pair()]
+
+
+def small_pair_cards() -> set[Card]:
     return gruen_pair() | eichel_pair()
 
 
-def big_pair() -> set[Card]:
+def big_pair_cards() -> set[Card]:
     return schell_pair() | rot_pair()
 
 
-def pair() -> set[Card]:
-    return small_pair() | big_pair()
+def pair_cards() -> set[Card]:
+    return small_pair_cards() | big_pair_cards()
 
 
 def generate_subsets(set_elements: set, subset_size: int) -> list[set]:
     subsets = []
     for subset in combinations(set_elements, subset_size):
-        subsets.add(set(subset))
+        subsets.append(set(subset))
     return subsets
 
 
 def small_halves() -> list[set[Card]]:
-    return [subset for subset in generate_subsets(small_pair(), 2) if subset not in [gruen_pair(), eichel_pair()]]
+    return [subset for subset in generate_subsets(small_pair_cards(), 2) if subset not in [gruen_pair(), eichel_pair()]]
 
 
 def big_halves() -> list[set[Card]]:
-    return [subset for subset in generate_subsets(big_pair(), 2) if subset not in [schell_pair(), rot_pair()]]
+    return [subset for subset in generate_subsets(big_pair_cards(), 2) if subset not in [schell_pair(), rot_pair()]]
 
 
 def three_halves() -> list[set[Card]]:
-    all_3_halves = generate_subsets(pair(), 3)
-    pairs = [gruen_pair(), eichel_pair(), schell_pair(), rot_pair()]
-    return [subset for subset in all_3_halves if not any(p.issubset(subset) for p in pairs)]
+    all_3_halves = generate_subsets(pair_cards(), 3)
+    return [subset for subset in all_3_halves if not any(p.issubset(subset) for p in pairs())]
 
 
+def player_has_set_probability(state: GameState, player_name: str, sets: list[set[Card]]):
+    """
+    This function is used for calculating the chance for a small pair being in the hand of player_name
+    before we know any of his cards
+    TODO add combinations with secure cards, so we can use this function in the middle of the game as well!
+    """
+    probability = 0
+    player_num = state.all_players.index(player_name)
+    possible_cards = [state.possible_cards[player_name]]
+    hand_card_counts = [state.player_cards_left[player_num]]
+    for player in state.all_players:
+        if player != player_name and player != state.name:
+            possible_cards.append(state.possible_cards[player])
+            hand_card_counts.append(state.player_cards_left[state.all_players.index(player_name)])
+    for set in sets:
+        probability += calculate_set_in_3set_probability(
+            possible_cards,
+            hand_card_counts,
+            set,
+            0)
+    return probability
