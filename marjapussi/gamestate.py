@@ -9,7 +9,6 @@ class GameState:
     def __init__(self, name: str, all_players: list[str], start_cards: list[Card]):
         self.name = name
         self.player_num = all_players.index(name)  # the player with index 0 is always first
-        self.partner = all_players[(self.player_num + 2) % 4]
         self.provoking_history: list[Action] = []
         self.game_value = 115
         self.current_trick = Trick()
@@ -236,3 +235,10 @@ class GameState:
             standing_cards |= standing_in_suite(self.cards_left, suit, suit_hand_cards)
 
         return standing_cards
+
+    def partner(self, player_name: str = None) -> str:
+        """Returns the partners name for a given player. Without input returns the partner of the gamestate owner"""
+        if not player_name:
+            player_name = self.name
+        p_index = self.all_players.index(player_name)
+        return self.all_players[(p_index + 2) % 4]

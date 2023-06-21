@@ -260,10 +260,10 @@ def player_has_set_probability(state: GameState, player_name: str, sets: list[se
         if player != player_name and player != state.name:
             possible_cards.append(state.possible_cards[player])
             hand_card_counts.append(state.player_cards_left[state.all_players.index(player_name)])
-    for set in sets:
+    for asset in sets:
         probability += calculate_set_in_3set_probability(
             possible_cards,
             hand_card_counts,
-            set,
+            asset,
             0)
     return probability
