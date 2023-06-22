@@ -195,41 +195,95 @@ class ProbabilisticPolicy(Policy):
             # we can tell for sure, the player has something:
             state.concepts.add(Concept(f"{player_name}_has_halves",
                                        {"player": player_name, "info_type": "halves"}, value=1.))
-            # very likely its a big pair
+            # very likely it's a big pair
             state.concepts.add(Concept(f"{player_name}_has_big_pair",
                                        {"player": player_name, "info_type": "pair"}, value=math.sqrt(big_pair_prob)))
         elif value == 140:
             # In this case, the information is unclear. We'd assume they wanna just play black, unless this is
             # our own partner, then we might try to hit a black game
             if player_name == state.partner(state.name):
-                state.concepts.add(Concept(f"playing_black", {}, value=0.3))
+                state.concepts.add(Concept(f"playing_black", {}, value=0.4))
             elif state.concepts.get_by_name(f"getting_played_black"):
                 state.concepts.add(Concept(f"getting_played_black", {},
                                            value=math.sqrt(state.concepts.get_by_name(f"getting_played_black").value)))
             else:
                 # TODO calculate actual probability of getting played black via dependencies instead of flat values
-                state.concepts.add(Concept(f"getting_player_black", {}, value=0.3))
+                state.concepts.add(Concept(f"getting_player_black", {}, value=0.4))
         else:
             # we can tell for sure, the player has something:
             state.concepts.add(Concept(f"{player_name}_has_halves",
                                        {"player": player_name, "info_type": "halves"}, value=1.))
             # first check if we skipped 140
-            if state.concepts.get_by_name(f"{state.partner(player_name)}_has_3+_halves"):
-                # if the partner indicated haves, it might just be a guessed step for a guessed pair
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
-                                           {"player": player_name, "info_type": "pair"},
-                                           value=math.sqrt(three_halves_prob)))
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"},
-                                           value=small_pair_prob))
+            if value == 145 or value == 150:
+                # this might ust be a small pair after all
+                if state.concepts.get_by_name(f"{state.partner(player_name)}_has_3+_halves"):
+                    # if the partner indicated haves, it might just be a guessed step for a guessed pair
+                    state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                               {"player": player_name, "info_type": "pair"},
+                                               value=math.sqrt(three_halves_prob)))
+                    state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                               {"player": player_name, "info_type": "pair"},
+                                               value=small_pair_prob))
+                else:
+                    # otherwise this is likely a small pair, as otherwise the player wouldn't go over 140.
+                    state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                                               {"player": player_name, "info_type": "pair"},
+                                               value=three_halves_prob))
+                    state.concepts.add(Concept(f"{player_name}_has_small_pair",
+                                               {"player": player_name, "info_type": "pair"},
+                                               value=math.sqrt(small_pair_prob)))
             else:
-                # otherwise this is likely a small pair, as otherwise the player wouldn't go over 140.
-                state.concepts.add(Concept(f"{player_name}_has_3+_halves",
+                # this is just straight up a big pair!
+                if big_pair_prob > 0:
+                    state.concepts.add(Concept(f"{player_name}_has_big_pair",
+                                               {"player": player_name, "info_type": "pair"},
+                                               value=math.sqrt(big_pair_prob)))
+                else:
+                    # TODO add something for enemy trying to snipe away our black in certain cases
+                    pass
+
+    @staticmethod
+    def _interpret_first_20_provoke(state: GameState, partner_steps: list[int], player_name: str,
+                                    value: int) -> None:
+        """
+        Information is saved inside the GameState object that the function adds concepts and information on to
+        TODO put this logic in dependencies and add on to it
+        """
+        # We'll just interpret anything that is a 20 step and not straight 140 as a big pair.
+
+        big_pair_prob = utils.player_has_set_probability(state, player_name, utils.big_pairs())
+        small_pair_prob = utils.player_has_set_probability(state, player_name, utils.small_pairs())
+        three_halves_prob = utils.player_has_set_probability(state, player_name, utils.three_halves())
+
+        if value == 140:
+            # In this case, the information is unclear. We'd assume they wanna just play black, unless this is
+            # our own partner, then we might try to hit a black game
+            if player_name == state.partner(state.name):
+                state.concepts.add(Concept(f"playing_black", {}, value=0.5))
+            elif state.concepts.get_by_name(f"getting_played_black"):
+                state.concepts.add(Concept(f"getting_played_black", {},
+                                           value=math.sqrt(state.concepts.get_by_name(f"getting_played_black").value)))
+            else:
+                # TODO calculate actual probability of getting played black via dependencies instead of flat values
+                state.concepts.add(Concept(f"getting_player_black", {}, value=0.5))
+            # we can tell for sure, the player has something:
+            state.concepts.add(Concept(f"{player_name}_has_halves",
+                                       {"player": player_name, "info_type": "halves"}, value=1.))
+            # very likely it's a big pair
+            state.concepts.add(Concept(f"{player_name}_has_big_pair",
+                                       {"player": player_name, "info_type": "pair"}, value=math.sqrt(big_pair_prob)))
+        else:
+            # we can tell for sure, the player has something:
+            state.concepts.add(Concept(f"{player_name}_has_halves",
+                                       {"player": player_name, "info_type": "halves"}, value=1.))
+            # this is just straight up a big pair!
+            if big_pair_prob > 0:
+                state.concepts.add(Concept(f"{player_name}_has_big_pair",
                                            {"player": player_name, "info_type": "pair"},
-                                           value=three_halves_prob))
-                state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                           {"player": player_name, "info_type": "pair"},
-                                           value=math.sqrt(small_pair_prob)))
+                                           value=math.sqrt(big_pair_prob)))
+            else:
+                # TODO add something for enemy trying to snipe away our black in certain cases
+                pass
 
     def _deduct_provoking_infos(self, state: GameState, player_num: int, value: int) -> None:
         """
@@ -264,11 +318,13 @@ class ProbabilisticPolicy(Policy):
                 case 15:
                     self._interpret_first_15_provoke(state, partner_steps, player_name, value)
                 case 20:
-                    pass
+                    self._interpret_first_20_provoke(state, partner_steps, player_name, value)
+                case 0:
+                    self._interpret_first_gone_provoke(state, partner_steps, player_name, value)
                 case _:
                     pass
 
-        # interpreting consecutive steps:
+        # TODO interpreting consecutive steps:
         else:
             pass
 
