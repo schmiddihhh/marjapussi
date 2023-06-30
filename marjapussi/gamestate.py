@@ -1,7 +1,8 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
 from marjapussi.action import Talk, Action
-from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite
+from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite, \
+    calculate_set_in_3set_probability
 from marjapussi.concept import Concept, ConceptStore
 
 
@@ -242,3 +243,26 @@ class GameState:
             player_name = self.name
         p_index = self.all_players.index(player_name)
         return self.all_players[(p_index + 2) % 4]
+
+    def player_has_set_probability(self, player_name: str, sets: list[set[Card]]):
+        """
+        This function is used for calculating the chance for a small pair being in the hand of player_name
+        before we know any of his cards
+        TODO add combinations with secure cards, so we can use this function in the middle of the game as well!
+        """
+        probability = 0
+        player_num = self.all_players.index(player_name)
+        possible_cards = [self.possible_cards[player_name]]
+        hand_card_counts = [self.player_cards_left[player_num]]
+        for player in self.all_players:
+            if player != player_name and player != self.name:
+                possible_cards.append(self.possible_cards[player])
+                hand_card_counts.append(self.player_cards_left[self.all_players.index(player_name)])
+        for asset in sets:
+            probability += calculate_set_in_3set_probability(
+                possible_cards,
+                hand_card_counts,
+                asset,
+                0)
+        return probability
+

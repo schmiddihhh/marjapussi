@@ -1,6 +1,5 @@
 from marjapussi.card import Card, Deck, Color, Value
 from marjapussi.trick import Trick
-from marjapussi.gamestate import GameState
 from itertools import combinations
 import math
 
@@ -245,25 +244,3 @@ def three_halves() -> list[set[Card]]:
     all_3_halves = generate_subsets(pair_cards(), 3)
     return [subset for subset in all_3_halves if not any(p.issubset(subset) for p in pairs())]
 
-
-def player_has_set_probability(state: GameState, player_name: str, sets: list[set[Card]]):
-    """
-    This function is used for calculating the chance for a small pair being in the hand of player_name
-    before we know any of his cards
-    TODO add combinations with secure cards, so we can use this function in the middle of the game as well!
-    """
-    probability = 0
-    player_num = state.all_players.index(player_name)
-    possible_cards = [state.possible_cards[player_name]]
-    hand_card_counts = [state.player_cards_left[player_num]]
-    for player in state.all_players:
-        if player != player_name and player != state.name:
-            possible_cards.append(state.possible_cards[player])
-            hand_card_counts.append(state.player_cards_left[state.all_players.index(player_name)])
-    for asset in sets:
-        probability += calculate_set_in_3set_probability(
-            possible_cards,
-            hand_card_counts,
-            asset,
-            0)
-    return probability

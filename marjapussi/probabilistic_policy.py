@@ -3,7 +3,7 @@ import math
 from marjapussi.policy import Policy
 from marjapussi.gamestate import GameState
 from marjapussi.action import Action
-from marjapussi.card import Card, Deck, Color, Value
+from marjapussi.card import Card, Color, Value
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
 from marjapussi.concept import Concept
@@ -21,7 +21,7 @@ class ProbabilisticPolicy(Policy):
         self.prov_base = 115
 
         self.max_reach_value = 0
-        self.max_opponent_reach_value = 420
+        self.max_opponent_reach_value = self.game_rules.max_game_value
 
         self.our_score = 0
         self.their_score = 0
@@ -42,6 +42,7 @@ class ProbabilisticPolicy(Policy):
             self.round = 1
 
         # already begin reasoning...
+        self._initialize_concepts(state)
         self._calculate_possible_card_probabilities(state)
         self._assess_own_hand(state)
 
@@ -128,8 +129,8 @@ class ProbabilisticPolicy(Policy):
         # Probability for small pair or three halves can be calculated, based on the probability
         # we can more accurately tell, which one it might be, given that the player already announced
         # that he has either one
-        small_pair_prob = utils.player_has_set_probability(state, player_name, utils.small_pairs())
-        three_halves_prob = utils.player_has_set_probability(state, player_name, utils.three_halves())
+        small_pair_prob = state.player_has_set_probability(player_name, utils.small_pairs())
+        three_halves_prob = state.player_has_set_probability(player_name, utils.three_halves())
 
         if value < 140:
             # we can tell for sure, the player has something:
@@ -187,9 +188,9 @@ class ProbabilisticPolicy(Policy):
         # Probability for a small pair if the step has skipped 140,
         # if the player has gone directly with +15, they might have a big pair
 
-        big_pair_prob = utils.player_has_set_probability(state, player_name, utils.big_pairs())
-        small_pair_prob = utils.player_has_set_probability(state, player_name, utils.small_pairs())
-        three_halves_prob = utils.player_has_set_probability(state, player_name, utils.three_halves())
+        big_pair_prob = state.player_has_set_probability(player_name, utils.big_pairs())
+        small_pair_prob = state.player_has_set_probability(player_name, utils.small_pairs())
+        three_halves_prob = state.player_has_set_probability(player_name, utils.three_halves())
 
         if value < 140:
             # we can tell for sure, the player has something:
@@ -251,9 +252,9 @@ class ProbabilisticPolicy(Policy):
         """
         # We'll just interpret anything that is a 20 step and not straight 140 as a big pair.
 
-        big_pair_prob = utils.player_has_set_probability(state, player_name, utils.big_pairs())
-        small_pair_prob = utils.player_has_set_probability(state, player_name, utils.small_pairs())
-        three_halves_prob = utils.player_has_set_probability(state, player_name, utils.three_halves())
+        big_pair_prob = state.player_has_set_probability(player_name, utils.big_pairs())
+        small_pair_prob = state.player_has_set_probability(player_name, utils.small_pairs())
+        three_halves_prob = state.player_has_set_probability(player_name, utils.three_halves())
 
         if value == 140:
             # In this case, the information is unclear. We'd assume they wanna just play black, unless this is
@@ -553,3 +554,10 @@ class ProbabilisticPolicy(Policy):
         # evaluate the probable success of an action, this is where the knowledge of the game should be used
         # for now, it's a placeholder and always returns 1
         return 1
+
+    def _initialize_concepts(self, state: GameState):
+        """
+        Add every concept that we could need for decisions in our probabilistic policy
+        """
+        # First add basic concepts that just record actions of players
+        
