@@ -1,6 +1,5 @@
 from contextlib import contextmanager
-from marjapussi.agent import Agent
-from marjapussi.agent import test_agents
+from marjapussi.agent import Agent, test_agents
 from marjapussi.game import MarjaPussi
 
 import random

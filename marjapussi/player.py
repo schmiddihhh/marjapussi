@@ -22,7 +22,7 @@ class Player():
 
     def take_trick(self, trick: Trick, last=False) -> None:
         self.tricks.append(trick)
-        self.points_made += sum([card.value.points() for card in trick.cards]) + (self.points["L"] if last else 0)
+        self.points_made += sum([card.value.points for card in trick.cards]) + (self.points["L"] if last else 0)
 
     def call_trump(self, col: Color) -> None:
         # points go to player calling or asking

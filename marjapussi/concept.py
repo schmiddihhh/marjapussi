@@ -4,6 +4,7 @@ from collections import defaultdict
 class Concept:
     def __init__(self, name: str, properties: dict, dependencies: list = None, weights: list[float] = None,
                  value: float = 0.):
+        # TODO Weightfunktion, linear
         self._name = name
         self._properties = properties
         if not dependencies:
@@ -65,3 +66,5 @@ class ConceptStore:
             property_objects = self.dict_by_properties[prop].get(value, set())
             matching_concepts &= property_objects  # intersect with the current matching concepts
         return matching_concepts
+
+
