@@ -49,7 +49,7 @@ class ProbabilisticPolicy(Policy):
     def _interpret_first_gone_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
         """
         Information is saved inside the GameState object that the function adds concepts and information on to
-        # TODO add more dpendancies to the concepts
+        # TODO add more dependencies to the concepts
         """
         if value < 140:
             if (not partner_steps) or partner_steps[0] == 0:
