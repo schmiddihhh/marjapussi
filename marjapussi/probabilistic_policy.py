@@ -519,36 +519,65 @@ class ProbabilisticPolicy(Policy):
         provoking_history = state.provoking_history
         # we want an optimistic estimate of what we could reach
         estimated_max = self._estimate_provoking_max(state)
+        next_value = 0
+        if len(provoking_history) < 4:
+            # this is the first time we provoke, we are careful!
+            # for now we apply standard rules:
+            if state.concepts.get_by_name(f"{state.partner()}_has_ace") and \
+                    utils.contains_ace(state.secure_cards[state.name]):
+                next_value = cur_value + 5
+            elif self_has_big_pair:
+                next_value = cur_value + 15
+                if next_value == 140:
+                    next_value = 145
+            elif self_has_small_pair:
+                next_value = cur_value + 10
+                if next_value == 140:
+                    next_value = 145
+            elif self_has_3_halves:
 
-        # Check if we are at risk of getting skunked
-        if self._calculate_concept_probabilities(state, 'getting_played_black'):
-            if max_value < 140:
-                return 140
-            elif max_value < 180:
-                return 180
-            elif max_value < 200:
-                return 200
-        elif cur_value < estimated_max:
-            # Check if we have a very good hand
-            if self._calculate_concept_probabilities(state, 'hand_card_value'):
-                if cur_value < 120:  # if we move first, let them not exchange information
-                    return 140
 
-            # Check if we have a pair of enough value
-            if self.has_valuable_pair():
-                if max_value < 140:
-                    return max_value + 5
+        else:
+            # Check if we are at risk of getting skunked
+            if state.concepts.get_by_name('getting_played_black').evaluate() > 0.7:
+                if cur_value < 140:
+                    next_value = 140
+                elif cur_value < 180:
+                    next_value = 180
+                elif cur_value < 200:
+                    next_value = 200
+                elif cur_value < 220:
+                    next_value = 220
+                elif cur_value < 240:
+                    next_value = 240
+                elif cur_value < estimated_max:
+                    next_value = estimated_max
+                else:
+                    next_value = 0
 
-            # Default provoking values
-            if self.has_ace() and not self.partner_has_indicated_ace(provoking_history):
-                return 5
-            elif self.has_three_halves_or_small_pair():
-                return 10
-            elif self.has_big_pair():
-                return 15
+            # check if we could even go higher:
+            elif cur_value < estimated_max:
+                # Check if we have a very good hand
+                if good_hand:
+                    if cur_value < 120:  # if we move first, let them not exchange information
+                        return 140
 
-            # If none of the above conditions are met, provoke with the current max_value
-            return max_value
+
+                # Check if we have a pair of enough value
+                if self.has_valuable_pair():
+                    if max_value < 140:
+                        return max_value + 5
+
+                # Default provoking values
+                if self.has_ace() and not self.partner_has_indicated_ace(provoking_history):
+                    return 5
+                elif self.has_three_halves_or_small_pair():
+                    return 10
+                elif self.has_big_pair():
+                    return 15
+
+        # If none of the above conditions are met, provoke with the current max_value
+        return next_value
 
     def evaluate_action(self, state: GameState, action: Action):
         # evaluate the probable success of an action, this is where the knowledge of the game should be used

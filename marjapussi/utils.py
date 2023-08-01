@@ -72,6 +72,16 @@ def contains_col_half(cards: list[Card], col: Color) -> bool:
     return any(card.color == col and (card.value == Value.Koenig or card.value == Value.Ober) for card in cards)
 
 
+def contains_col_ace(cards: list[Card], col: Color) -> bool:
+    """Checks cards for an ace in specified color"""
+    return any(card.color == col and card.value == Value.Ass for card in cards)
+
+
+def contains_ace(cards: list[Card]) -> bool:
+    """Checks cards for an ace"""
+    return any(card.value == Value.Ass for card in cards)
+
+
 def sorted_cards(cards: list[Card]) -> list[Card]:
     return sorted(cards, key=lambda card: (card.color, card.value))
 
