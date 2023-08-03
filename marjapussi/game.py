@@ -17,7 +17,7 @@ class MarjaPussi():
         "max_game_value": 420,
         "points": {symb: val for symb, val in zip("rsegAZKOU9876L", [100, 80, 60, 40, 11, 10, 4, 3, 2, 0, 0, 0, 0, 20])},
         "start_phase": "PROV",
-    }
+    } # TODO swap this for a centralised GameRules class
 
     def __init__(self, player_names: list[str], override_rules =None, log= True, fancy=True, language=1) -> None:
         # init logger

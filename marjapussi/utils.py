@@ -72,12 +72,12 @@ def contains_col_half(cards: list[Card], col: Color) -> bool:
     return any(card.color == col and (card.value == Value.Koenig or card.value == Value.Ober) for card in cards)
 
 
-def contains_col_ace(cards: list[Card], col: Color) -> bool:
-    """Checks cards for an ace in specified color"""
-    return any(card.color == col and card.value == Value.Ass for card in cards)
+def contains_pair(cards: set[Card]) -> bool:
+    """Checks cards for having any pair"""
+    return any([pair for pair in pairs() if pair.issubset(cards)])
 
 
-def contains_ace(cards: list[Card]) -> bool:
+def contains_ace(cards: set[Card]) -> bool:
     """Checks cards for an ace"""
     return any(card.value == Value.Ass for card in cards)
 
@@ -254,3 +254,6 @@ def three_halves() -> list[set[Card]]:
     all_3_halves = generate_subsets(pair_cards(), 3)
     return [subset for subset in all_3_halves if not any(p.issubset(subset) for p in pairs())]
 
+
+def is_probable(value: float) -> float:
+    return math.sqrt(math.sqrt(math.sqrt(value)))

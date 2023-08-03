@@ -2,15 +2,24 @@ from collections import defaultdict
 
 
 class Concept:
+    """
+    This class encodes all knowledge an agent has about
+    a game. Concepts can be "basic" or "dependent".
+    Basic concepts are set by the agent's code, for example
+    how probable certain combinations of cards are, or
+    which provoking steps a player does.
+    """
     def __init__(self, name: str, properties: dict, dependencies: list = None, weights: list[float] = None,
                  value: float = 0.):
-        # TODO Weightfunktion, linear
+        # TODO weight function (-> linear) or non-linear
         self._name = name
         self._properties = properties
         if not dependencies:
             dependencies = []
         self.dependencies = dependencies  # these are names of other concepts
         self.value = value
+        if value > 1:
+            self.value = 1
         if not weights:
             self.weights = [1.] * len(dependencies)
         elif len(dependencies) != len(weights):
@@ -26,6 +35,13 @@ class Concept:
         return self._properties
 
     def evaluate(self, lazy: bool = False) -> float:
+        """
+        Concepts are not evaluated until needed.
+        TODO:
+         - cache calculations
+         - invalidate cache upon change
+         - when probabilities change re-evaluate in a background
+        """
         if self.dependencies and not lazy:
             return sum(x * y for x, y in zip(self.dependencies, self.weights))
         else:
@@ -66,5 +82,3 @@ class ConceptStore:
             property_objects = self.dict_by_properties[prop].get(value, set())
             matching_concepts &= property_objects  # intersect with the current matching concepts
         return matching_concepts
-
-

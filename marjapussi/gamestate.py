@@ -1,4 +1,5 @@
 from marjapussi.card import Card, Deck, Color, Value
+from marjapussi.gamerules import GameRules
 from marjapussi.trick import Trick
 from marjapussi.action import Talk, Action
 from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite, \
@@ -10,8 +11,9 @@ class GameState:
     def __init__(self, name: str, all_players: list[str], start_cards: list[Card]):
         self.name = name
         self.player_num = all_players.index(name)  # the player with index 0 is always first
+        self.game_rules = GameRules()
         self.provoking_history: list[Action] = []
-        self.game_value = 115
+        self.game_value = 115 # TODO use value from game rules
         self.current_trick = Trick()
         self.playing_party = None
         self.all_tricks = []
@@ -70,6 +72,22 @@ class GameState:
         if action.content > 0:
             self.game_value = action.content
         self.provoking_history.append(action)
+
+    def provoking_steps(self, player_number: int) -> list[int]:
+        """returns all steps this player provoked thus far, the last step being 0 if they folded"""
+
+        steps = []
+
+        provoking_history_ints = list(map(lambda h: h.content, self.provoking_history))
+        provoking_history_ints.insert(0, 115)
+
+        for i in range(len(self.provoking_history)):
+            if self.provoking_history[i].player_number == player_number:
+                prov_base = max(provoking_history_ints[:i + 1])
+                print(prov_base, self.provoking_history[i].content)
+                steps.append(max(0, self.provoking_history[i].content - prov_base))
+
+        return steps
 
     def pass_card(self, card_pass: Card, player_name: str, player_num: int, partner_num: int):
         self.secure_cards[player_name].discard(card_pass)
@@ -243,6 +261,13 @@ class GameState:
             player_name = self.name
         p_index = self.all_players.index(player_name)
         return self.all_players[(p_index + 2) % 4]
+
+    def partner_num(self, player_num: int = None) -> int:
+        """Returns the partners number for a given player. Without input returns the partner of the gamestate owner"""
+        if not player_num:
+            player_num = self.all_players.index(self.name)
+        return (player_num + 2) % 4
+
 
     def player_has_set_probability(self, player_name: str, sets: list[set[Card]]):
         """
