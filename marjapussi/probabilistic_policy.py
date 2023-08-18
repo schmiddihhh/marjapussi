@@ -7,6 +7,7 @@ from marjapussi.card import Card, Color, Value
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
 from marjapussi.concept import Concept
+from itertools import combinations
 import marjapussi.utils as utils
 import numpy as np
 
@@ -28,6 +29,7 @@ class ProbabilisticPolicy(Policy):
         self.game_rules = GameRules()
         self.prov_base = 115
         self.to_be_communicated = []
+        self.communicated = []
 
         self.max_reach_value = 0
         self.max_opponent_reach_value = self.game_rules.max_game_value
@@ -54,8 +56,7 @@ class ProbabilisticPolicy(Policy):
         self._initialize_concepts(state)
         self._calculate_possible_card_probabilities(state)
         self._assess_own_hand(state)
-        # make a list of things to communicate with my partner:
-        self.to_be_communicated = self._to_communicate(state)
+        self._to_communicate(state)
 
     @staticmethod
     def _interpret_first_gone_provoke(state: GameState, partner_steps: list[int], player_name: str, value: int) -> None:
@@ -152,7 +153,8 @@ class ProbabilisticPolicy(Policy):
                 state.concepts.add(Concept(f"{player_name}_has_ace",
                                            {"player": player_name, "source": "provoking"}, value=0.1))
             state.concepts.add(Concept(f"{player_name}_has_small_pair",
-                                       {"player": player_name, "source": "provoking"}, value = utils.is_probable(small_pair_prob)))
+                                       {"player": player_name, "source": "provoking"},
+                                       value=utils.is_probable(small_pair_prob)))
             state.concepts.add(Concept(f"{player_name}_has_3+_halves",
                                        {"player": player_name, "source": "provoking"},
                                        value=utils.is_probable(three_halves_prob)))
@@ -163,7 +165,8 @@ class ProbabilisticPolicy(Policy):
                 state.concepts.add(Concept(f"playing_black", {}, value=0.3))
             elif state.concepts.get_by_name(f"getting_played_black"):
                 state.concepts.add(Concept(f"getting_played_black", {},
-                                           value=utils.is_probable(state.concepts.get_by_name(f"getting_played_black").value)))
+                                           value=utils.is_probable(
+                                               state.concepts.get_by_name(f"getting_played_black").value)))
             else:
                 # TODO calculate actual probability of getting played black via dependencies instead of flat values
                 state.concepts.add(Concept(f"getting_player_black", {}, value=0.3))
@@ -204,12 +207,17 @@ class ProbabilisticPolicy(Policy):
         three_halves_prob = state.player_has_set_probability(player_name, utils.three_halves())
 
         if value < 140:
+            if (partner_steps and partner_steps[0] != 5) or not partner_steps:
+                # we are dealing somewhat likely with no ace
+                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                           {"player": player_name, "source": "provoking"}, value=0.2))
             # we can tell for sure, the player has something:
             state.concepts.add(Concept(f"{player_name}_has_halves",
                                        {"player": player_name, "source": "provoking"}, value=1.))
             # very likely it's a big pair
             state.concepts.add(Concept(f"{player_name}_has_big_pair",
-                                       {"player": player_name, "source": "provoking"}, value=utils.is_probable(big_pair_prob)))
+                                       {"player": player_name, "source": "provoking"},
+                                       value=utils.is_probable(big_pair_prob)))
         elif value == 140:
             # In this case, the information is unclear. We'd assume they wanna just play black, unless this is
             # our own partner, then we might try to hit a black game
@@ -217,7 +225,8 @@ class ProbabilisticPolicy(Policy):
                 state.concepts.add(Concept(f"playing_black", {}, value=0.4))
             elif state.concepts.get_by_name(f"getting_played_black"):
                 state.concepts.add(Concept(f"getting_played_black", {},
-                                           value=utils.is_probable(state.concepts.get_by_name(f"getting_played_black").value)))
+                                           value=utils.is_probable(
+                                               state.concepts.get_by_name(f"getting_played_black").value)))
             else:
                 # TODO calculate actual probability of getting played black via dependencies instead of flat values
                 state.concepts.add(Concept(f"getting_player_black", {}, value=0.4))
@@ -272,7 +281,8 @@ class ProbabilisticPolicy(Policy):
                 state.concepts.add(Concept(f"playing_black", {}, value=0.5))
             elif state.concepts.get_by_name(f"getting_played_black"):
                 state.concepts.add(Concept(f"getting_played_black", {},
-                                           value=utils.is_probable(state.concepts.get_by_name(f"getting_played_black").value)))
+                                           value=utils.is_probable(
+                                               state.concepts.get_by_name(f"getting_played_black").value)))
             else:
                 # TODO calculate actual probability of getting played black via dependencies instead of flat values
                 state.concepts.add(Concept(f"getting_player_black", {}, value=0.5))
@@ -281,8 +291,13 @@ class ProbabilisticPolicy(Policy):
                                        {"player": player_name, "source": "provoking"}, value=1.))
             # very likely it's a big pair
             state.concepts.add(Concept(f"{player_name}_has_big_pair",
-                                       {"player": player_name, "source": "provoking"}, value=utils.is_probable(big_pair_prob)))
+                                       {"player": player_name, "source": "provoking"},
+                                       value=utils.is_probable(big_pair_prob)))
         else:
+            if (partner_steps and partner_steps[0] != 5) or not partner_steps:
+                # we are dealing somewhat likely with no ace
+                state.concepts.add(Concept(f"{player_name}_has_ace",
+                                           {"player": player_name, "source": "provoking"}, value=0.1))
             # we can tell for sure, the player has something:
             state.concepts.add(Concept(f"{player_name}_has_halves",
                                        {"player": player_name, "source": "provoking"}, value=1.))
@@ -365,7 +380,7 @@ class ProbabilisticPolicy(Policy):
         different suites. If we can't ensure that we could get a trick in a suite if they don't
         TODO put this logic in dependencies
         """
-        hand_cards: set[Card] = state.secure_cards[state.name]
+        hand_cards: set[Card] = state.hand_cards
         # arbitrary hand score, for our own sake ^^ we will keep track of how good we stand
 
         # TODO make dependant concepts out of these scores
@@ -464,8 +479,47 @@ class ProbabilisticPolicy(Policy):
         """
         estimated_value = 0
         estimated_max = 140
-        # TODO
+
+        # consider all pair points we can get
+        # my pairs
+        if utils.gruen_pair() in state.hand_cards:
+            estimated_value += 40
+        if utils.eichel_pair() in state.hand_cards:
+            estimated_value += 60
+        if utils.schell_pair() in state.hand_cards:
+            estimated_value += 80
+        if utils.rot_pair() in state.hand_cards:
+            estimated_value += 100
+        estimated_max += estimated_value
+
+        # partners pairs
+        if state.concepts.get_by_name(f"{state.partner()}_has_big_pair"):
+            if (Card(Color.Schell, Value.Ober) in state.hand_cards or
+                    Card(Color.Schell, Value.Koenig) in state.hand_cards):
+                estimated_value += 100
+            else:
+                estimated_value += 80
+        if state.concepts.get_by_name(f"{state.partner()}_has_small_pair"):
+            if (Card(Color.Gruen, Value.Ober) in state.hand_cards or
+                    Card(Color.Gruen, Value.Koenig) in state.hand_cards):
+                estimated_value += 60
+            else:
+                estimated_value += 40
+
+        # our pairs
+        if state.concepts.get_by_name(f"{state.partner()}_has_3+_halves"):
+
+
+        # estimate the standing cards we could have as a team
+
+        # estimate last trick security
+
+        # estimate obstacles by enemy team
+
+        # estimate standing cards
+
         return estimated_value, estimated_max
+
     def _plan_game(self, state):
         """
         This method is only for the playing player!
@@ -517,7 +571,7 @@ class ProbabilisticPolicy(Policy):
         """
         Updates things that we shouldn't communicate anymore, because we missed the chance!
         """
-        hand_cards = state.secure_cards[state.name]
+        hand_cards: set[Card] = state.hand_cards
         partner = state.partner()
 
         # remove ace to be communicated when:
@@ -528,10 +582,11 @@ class ProbabilisticPolicy(Policy):
             self.to_be_communicated.remove(ProvokingInfos.Ass)
 
         elif cur_value >= 140 and (not (state.concepts.get_by_name(f"{partner}_has_big_pair").value > 0.8  # CONCEPT
-                       or (state.concepts.get_by_name(f"{partner}_has_small_pair").value >
-                           state.concepts.get_by_name(f"{partner}_has_3+_halves").value)
-                       or utils.contains_pair(hand_cards))):
+                                        or (state.concepts.get_by_name(f"{partner}_has_small_pair").value >
+                                            state.concepts.get_by_name(f"{partner}_has_3+_halves").value)
+                                        or utils.contains_pair(hand_cards))):
             self.to_be_communicated.remove(ProvokingInfos.Ass)
+            self.communicated.append(ProvokingInfos.Ass)
 
         elif len(state.provoking_history) >= 4:
             self.to_be_communicated.remove(ProvokingInfos.Ass)
@@ -549,7 +604,7 @@ class ProbabilisticPolicy(Policy):
         - I have a small pair
         - I have 3+ halves
         """
-        hand_cards = state.secure_cards[state.name]
+        hand_cards: set[Card] = state.hand_cards
         self.to_be_communicated = []
 
         # need to call out my ace:
@@ -601,11 +656,15 @@ class ProbabilisticPolicy(Policy):
         estimated_value, estimated_max = self._estimate_game_value(state)
 
         next_value = cur_value
+        regular_provoking_value = None
+        communication = None
         if len(self.to_be_communicated) > 0:
-            next_value = self._standard_provoking(self.to_be_communicated.pop(0), cur_value)
+            communication = self.to_be_communicated.pop(0)
+            next_value = self._standard_provoking(communication, cur_value)
+            regular_provoking_value = next_value
 
         # Check if we are at risk of getting skunked
-        elif next_value == cur_value and state.concepts.get_by_name("getting_played_black").evaluate() > 0.7: # CONCEPT
+        elif next_value == cur_value and state.concepts.get_by_name("getting_played_black").evaluate() > 0.7:  # CONCEPT
             if cur_value < 140:
                 next_value = 140
             elif cur_value < 180:
@@ -622,11 +681,139 @@ class ProbabilisticPolicy(Policy):
                 next_value = cur_value
 
         # Do we want to take the game? We should if we can reach and can't properly pass cards
-        elif
+        elif estimated_value > cur_value:
+            if state.provoking_steps(state.partner_num()) and state.provoking_steps(state.partner_num())[-1] == 0:
+                next_value = cur_value + 5
+            elif self.eval_passing(state, self.passing_best(state)) < 5:
+                next_value = cur_value + 5
 
         # If none of the above conditions are met, provoke with the current max_value
-        return max(cur_value, min(next_value, estimated_max))
+        prov_value = max(cur_value, min(next_value, estimated_max))
 
+        # update communications
+        if regular_provoking_value and regular_provoking_value == prov_value:
+            self.communicated.append(communication)
+
+        return prov_value
+
+    def eval_passing(self, state: GameState, passed_cards: set[Card]) -> float:
+        """
+        Evaluating passed cards based on the GameState, before passing them.
+        Factors that play a role:
+        - getting rid of 2 colors
+        - passing necessary cards (not knowing they got an ace? Pass it!)
+        - ambiguous information
+        -> low card in a non blank color
+        -> giving halves of pairs signaled (splitting pairs)
+        ->
+        - getting rid of blank 10s or pairs
+        - not passing stuff you already signaled
+        - passing cards to clear up information (didn't call the ace? Pass it!)
+        - passing valuable cards if possible
+        """
+        total = 0
+        hand_without_passed = [card for card in state.hand_cards if not card in passed_cards]
+        hand_wop_sorted = [[card for card in hand_without_passed if card.color == color] for color in Color]
+        color_amounts = [len(cards) for cards in hand_wop_sorted]
+
+        # check being blank in two colors
+        if sum([min(amount, 1) for amount in color_amounts]) <= 2:
+            total += 5
+
+        # check passing necessary cards
+        # check fo ace
+        # TODO check for specific pair
+        # TODO make sure this value is most definitely set if used for actual passing, need to know the ace probability
+        if (state.concepts.get_by_name(f"{state.partner()}_has_ace") and
+                state.concepts.get_by_name(f"{state.partner()}_has_ace").value < 0.5 and
+                utils.contains_ace(passed_cards)):
+            total += 8
+
+        # check ambiguities
+        passed_sorted = [[card for card in passed_cards if card.color == color] for color in Color]
+        for i, amount in enumerate(color_amounts):
+            # having cards but still passing a low card of that color
+            if amount > 0 and utils.contains_low_card(set(passed_sorted[i])):
+                total -= 3
+            if amount == 0 and utils.contains_low_card(set(hand_wop_sorted[i])):
+                total -= 2
+
+        # check blank high cards
+        total -= 3 * len([cards for cards in hand_wop_sorted if len(cards) == 1 and cards[0].value > Value.Unter])
+
+        # check given information
+        if ProvokingInfos.Halves3 in self.communicated or ProvokingInfos.Halves2 in self.communicated:
+            if len([card for card in passed_cards if card.value == Value.Koenig or card.value == Value.Ober]) >= 2:
+                total += 1
+
+        # keep pairs that are communicated, pass pairs that aren't, depending on value
+        # TODO care for case, when two small or two big pairs were communicated
+        if ProvokingInfos.SmallPair in self.communicated:
+            if utils.contains_col_pair(list(hand_without_passed), Color.Gruen) and len(hand_wop_sorted[1]) == 0:
+                total += 2
+            if utils.contains_col_pair(list(hand_without_passed), Color.Eichel) and len(hand_wop_sorted[0]) == 0:
+                total += 2
+        else:
+            if (utils.contains_col_pair(list(state.hand_cards), Color.Gruen) and
+                    not utils.contains_col_pair(list(passed_cards), Color.Gruen)):
+                total -= 1
+            if (utils.contains_col_pair(list(state.hand_cards), Color.Eichel) and
+                    not utils.contains_col_pair(list(passed_cards), Color.Eichel)):
+                total -= 2
+
+        if ProvokingInfos.BigPair in self.communicated:
+            if utils.contains_col_pair(list(hand_without_passed), Color.Schell) and len(hand_wop_sorted[3]) == 0:
+                total += 2
+            if utils.contains_col_pair(list(hand_without_passed), Color.Rot) and len(hand_wop_sorted[2]) == 0:
+                total += 2
+        else:
+            if (utils.contains_col_pair(list(state.hand_cards), Color.Schell) and
+                    not utils.contains_col_pair(list(passed_cards), Color.Schell)):
+                total -= 3
+            if (utils.contains_col_pair(list(state.hand_cards), Color.Rot) and
+                    not utils.contains_col_pair(list(passed_cards), Color.Rot)):
+                total -= 4
+
+        # we would like to plan ourselves if possible, if we have 5 or more halves!
+        hand_halves = set([card for card in state.hand_cards if card in utils.pair_cards()])
+        if len(hand_halves) > 4:
+            total -= 3
+        if len(hand_halves) > 5:
+            total -= 3
+        if len(hand_halves) > 6:
+            total -= 3
+        if len(hand_halves) > 7:
+            total -= 3
+
+        # check overall value of hand cards given
+        for card in passed_cards:
+            if card.value > Value.Unter:
+                total += 0.5
+
+        for card in hand_without_passed:
+            if card.value > Value.Unter:
+                total -= 1
+
+        # try not to pass green if unnecessary
+        for card in passed_cards:
+            if card.color == Color.Gruen: total -= 0.5
+
+        return total
+
+    def passing_best(self, state: GameState) -> set[Card]:
+        """
+        calculate the best passing cards, based on the evaluations of all possible card combinations
+        for the 9 original hand cards it is (9 over 4) = 126 combinations to test
+        TODO add methods to reduce the combinations drastically beforehand
+        """
+        best_eval = -1000
+        best_set = None
+        for subset in combinations(state.hand_cards, 4):
+            eval_s = self.eval_passing(subset)
+            if best_eval < eval_s:
+                best_eval = eval_s
+                best_set = subset
+        return best_set
 
     def evaluate_action(self, state: GameState, action: Action):
         # evaluate the probable success of an action, this is where the knowledge of the game should be used
@@ -638,4 +825,3 @@ class ProbabilisticPolicy(Policy):
         Add every concept that we could need for decisions in our probabilistic policy
         """
         # First add basic concepts that just record actions of players
-        

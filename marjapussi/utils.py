@@ -82,6 +82,11 @@ def contains_ace(cards: set[Card]) -> bool:
     return any(card.value == Value.Ass for card in cards)
 
 
+def contains_low_card(cards: set[Card]) -> bool:
+    """Checks cards for at least one low card (joker or down)"""
+    return any(card.value <= Value.Unter for card in cards)
+
+
 def sorted_cards(cards: list[Card]) -> list[Card]:
     return sorted(cards, key=lambda card: (card.color, card.value))
 

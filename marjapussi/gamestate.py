@@ -13,7 +13,7 @@ class GameState:
         self.player_num = all_players.index(name)  # the player with index 0 is always first
         self.game_rules = GameRules()
         self.provoking_history: list[Action] = []
-        self.game_value = 115 # TODO use value from game rules
+        self.game_value = 115  # TODO use value from game rules
         self.current_trick = Trick()
         self.playing_party = None
         self.all_tricks = []
@@ -22,7 +22,7 @@ class GameState:
         self.possible_cards = {player: set() if player == name else set(Deck().cards).difference(start_cards)
                                for player in all_players}
         self.possible_cards_probabilities = {player: set() if player == name else
-                                             set(Deck().cards).difference(start_cards) for player in all_players}
+        set(Deck().cards).difference(start_cards) for player in all_players}
         self.secure_cards = {player: set(start_cards) if player == name else set() for player in all_players}
         self.playing_player = ''
         self.asking_status = {player: 0 for player in all_players}
@@ -41,8 +41,9 @@ class GameState:
     def play_card(self, card_played: Card, player_num: int):
         # do the action on the agents representation of the trick
         player_name = self.all_players[player_num]
-        assert card_played in self.possible_cards[player_name] | self.secure_cards[player_name], \
-            "Card has to be possible if it is played."
+        assert card_played in (self.possible_cards[player_name] | self.secure_cards[player_name]), \
+            (f"Card has to be possible for player {self.name}'s view, if it is played. Cards still possible:"
+             f" {[str(card) for card in (self.possible_cards[player_name] | self.secure_cards[player_name])]}")
         self.current_trick.play_card(card_played, player_num)
 
         # remove the card played from all players, it is no longer in the game
@@ -75,7 +76,6 @@ class GameState:
 
     def provoking_steps(self, player_number: int) -> list[int]:
         """returns all steps this player provoked thus far, the last step being 0 if they folded"""
-
         steps = []
 
         provoking_history_ints = list(map(lambda h: h.content, self.provoking_history))
@@ -84,7 +84,6 @@ class GameState:
         for i in range(len(self.provoking_history)):
             if self.provoking_history[i].player_number == player_number:
                 prov_base = max(provoking_history_ints[:i + 1])
-                print(prov_base, self.provoking_history[i].content)
                 steps.append(max(0, self.provoking_history[i].content - prov_base))
 
         return steps
@@ -120,7 +119,7 @@ class GameState:
                 self._set_secure_card(Card(answer.color, Value.Ober), player_name)
                 self.current_trick.trump_color = answer.color
                 self.concepts.add(Concept(f"{player_name}_has_{answer.color}_pair",
-                                          {"color": answer.color, "player": player_name, "info_type": "no_pair"}))
+                                          {"color": answer.color, "player": player_name, "info_type": "pair"}))
             case "ou":
                 pair = {Card(answer.color, Value.Koenig), Card(answer.color, Value.Ober)}
                 poss_update = self.possible_cards[player_name].intersection(pair)
@@ -180,6 +179,7 @@ class GameState:
         """
         We check all possible cards and secure cards to see if we can combine information with what we know
         from calls about pairs and halves to deduct further implications
+        - played card called needs to be removed, we don't know anymore
         """
         p_val = played_card.value
         p_col = played_card.color
@@ -196,7 +196,7 @@ class GameState:
                         if player_name == player:
                             self.concepts.remove(concept.name)
                         else:
-                            if not (other_card in self.possible_cards[player] | self.secure_cards[player]):
+                            if not (other_card in (self.possible_cards[player] | self.secure_cards[player])):
                                 raise ValueError(f"{player} announced a card {str(other_card)} but doesn't posses one.")
                             self._set_secure_card(Card(p_col, other_val), player)
             # check for no pair calls
@@ -224,12 +224,14 @@ class GameState:
                     updated = True
                     for card in only_for_i:
                         self._set_secure_card(card, self.all_players[i])
+                        poss_card_counts[i] -= 1
 
                 # check if there is a possible card set, that is equal in size to the amount of cards the player has
                 if poss_card_counts[i] != 0 and len(possible_cards[i]) == poss_card_counts[i]:
                     updated = True
                     while possible_cards[i]:
                         self._set_secure_card(possible_cards[i].pop(), self.all_players[i])
+                        poss_card_counts[i] -= 1
             if not updated:
                 break
             else:
@@ -268,7 +270,6 @@ class GameState:
             player_num = self.all_players.index(self.name)
         return (player_num + 2) % 4
 
-
     def player_has_set_probability(self, player_name: str, sets: list[set[Card]]):
         """
         This function is used for calculating the chance for a small pair being in the hand of player_name
@@ -291,3 +292,6 @@ class GameState:
                 0)
         return probability
 
+    @property
+    def hand_cards(self):
+        return self.secure_cards[self.name]

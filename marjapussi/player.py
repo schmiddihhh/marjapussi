@@ -29,7 +29,7 @@ class Player():
         if col in self.trump_calls:
             return
         self.trump_calls.append(col)
-        self.points_made += col.points()
+        self.points_made += col.points
 
     def give_card(self, c: Card) -> None:
         """Gives the player an additional card."""
