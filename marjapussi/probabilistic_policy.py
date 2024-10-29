@@ -38,7 +38,7 @@ class ProbabilisticPolicy(Policy):
         self.their_score = 0
         self.round = 1
 
-    def game_start(self, state: GameState, scores: [int, int] = None, total_rounds: int = 8):
+    def game_start(self, state: GameState, scores: list[int] = None, total_rounds: int = 8):
         super().game_start(state)
         """initializes the Policy to be ready for next game"""
         if not scores:
