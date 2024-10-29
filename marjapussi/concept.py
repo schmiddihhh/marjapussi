@@ -3,7 +3,7 @@ from collections import defaultdict
 
 class Concept:
     """
-    This class encodes all knowledge an agent has about
+    This class encodes all knowledge an agent has aboutxD that might be cool!
     a game. Concepts can be "basic" or "dependent".
     Basic concepts are set by the agent's code, for example
     how probable certain combinations of cards are, or

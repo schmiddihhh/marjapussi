@@ -200,6 +200,12 @@ def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: s
     return set(standing)
 
 
+def standing_cards(leftover_cards: set[Card], possible_cards: set[Card]) -> set[Card]:
+    standing = set()
+    for suite in Color:
+        standing |= standing_in_suite(leftover_cards, suite, possible_cards)
+    return standing
+
 def gruen_pair() -> set[Card]:
     return {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
 
@@ -240,6 +246,9 @@ def pair_cards() -> set[Card]:
     return small_pair_cards() | big_pair_cards()
 
 
+def ace_cards() -> set[Card]:
+    return set([Card(col, Value.Ass) for col in Color])
+
 def generate_subsets(set_elements: set, subset_size: int) -> list[set]:
     subsets = []
     for subset in combinations(set_elements, subset_size):
@@ -262,3 +271,10 @@ def three_halves() -> list[set[Card]]:
 
 def is_probable(value: float) -> float:
     return math.sqrt(math.sqrt(math.sqrt(value)))
+
+
+def smallest_x(cards: set[Card], x: int) -> list[Card]:
+    """
+    returns the smallest x cards out of the given cards, order: g6 -> gA, e6 -> eA, s6 -> sA, r6 -> rA
+    """
+    return sorted_cards(list(cards))[0:x]
