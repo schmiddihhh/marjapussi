@@ -33,6 +33,5 @@ while not game.phase == "DONE":
     game.act_action(action)
 ```
 
-
 ## Contributing
 You are more than welcome to send pull requests or simply talk to me if you think something is wrong or could be done more pythonic.

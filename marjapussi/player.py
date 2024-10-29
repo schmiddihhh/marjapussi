@@ -1,4 +1,6 @@
-import marjapussi.utils as utils
+from marjapussi.card import Card, Value, Color
+from marjapussi.utils import sorted_cards
+from marjapussi.trick import Trick
 
 
 class Player():
@@ -15,36 +17,36 @@ class Player():
         self.still_prov = True
         self.prov_val = 0  # highest value said
         self.tricks = []  # all tricks self made
-        self.sup_calls = []  # all colors called sup by self
+        self.trump_calls = []  # all colors called sup by self
         self.points_made = 0  # sum of points of self
 
-    def take_trick(self, trick, last=False) -> None:
+    def take_trick(self, trick: Trick, last=False) -> None:
         self.tricks.append(trick)
-        self.points_made += sum([self.points[card[2]]
-                                for card in trick]) + (self.points["L"] if last else 0)
+        self.points_made += sum([card.value.points for card in trick.cards]) + (self.points["L"] if last else 0)
 
-    def call_sup(self, col) -> None:
+    def call_trump(self, col: Color) -> None:
         # points go to player calling or asking
-        if col in self.sup_calls:
+        if col in self.trump_calls:
             return
-        self.sup_calls.append(col)
-        self.points_made += self.points[col]
+        self.trump_calls.append(col)
+        self.points_made += col.points
 
-    def give_card(self, c: str) -> None:
+    def give_card(self, c: Card) -> None:
         """Gives the player an additional card."""
         self.cards.append(c)
         # ? sorting doesn't need to be here but is convenient
-        self.cards = utils.sorted_cards(self.cards)
+        self.cards = sorted_cards(self.cards)
 
-    def take_card(self, c: str) -> None:
+    def take_card(self, c: Card) -> None:
         self.cards = list(set(self.cards) - {c, })
-        self.cards = utils.sorted_cards(self.cards)
+        self.cards = sorted_cards(self.cards)
 
     def set_partner(self, partner) -> None:
         self.partner: Player = partner
 
     def set_next_player(self, next_player) -> None:
-        self.next_player = next_player
+        self.next_player: Player = next_player
 
+    @property
     def player_info(self) -> dict:
         return {'name': self.name, 'cards': self.cards}
