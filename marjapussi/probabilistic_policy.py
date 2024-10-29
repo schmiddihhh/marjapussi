@@ -3,7 +3,7 @@ from enum import Enum
 from marjapussi.policy import Policy
 from marjapussi.gamestate import GameState
 from marjapussi.action import Action
-from marjapussi.card import Card, Color, Value
+from marjapussi.card import Card, Color, Value, Deck
 from marjapussi.gamerules import GameRules
 from marjapussi.policy_player import PolicyPlayer
 from marjapussi.concept import Concept
@@ -38,7 +38,7 @@ class ProbabilisticPolicy(Policy):
         self.their_score = 0
         self.round = 1
 
-    def game_start(self, state: GameState, scores: [int, int] = None, total_rounds: int = 8):
+    def game_start(self, state: GameState, scores: list[int] = None, total_rounds: int = 8):
         super().game_start(state)
         """initializes the Policy to be ready for next game"""
         if not scores:
@@ -313,7 +313,7 @@ class ProbabilisticPolicy(Policy):
     def _deduct_provoking_infos(self, state: GameState, player_num: int, value: int) -> None:
         """
         We need infos about what the players are trying to communicate!
-        For now we assume they have the same provoking rules as we have :)
+        For now, we assume they have the same provoking rules as we have :)
         In the Future it might be wise to not rely too much on what the opponents try to communicate
         As this way players could abuse the AI too much by feeding false information
         We will also have to assume more variety when playing with other AI policies together
@@ -439,6 +439,9 @@ class ProbabilisticPolicy(Policy):
                 # add some arbitrary amount for the colors for evaluation
                 hand_score += color.points / 5
                 opp_estimate_max -= color.points
+                state.concepts.add(Concept(f"{state.name}_has_{str(color)}_half",
+                                           {"player": state.name, "source": "assessment", "color": color},
+                                           value=1.))
             else:
                 # TODO estimate if there is anything we can deduct from having nothing?! (Risking enemy trump)
                 pass
@@ -479,44 +482,94 @@ class ProbabilisticPolicy(Policy):
         """
         estimated_value = 0
         estimated_max = 140
+        unknown_pairs = utils.pairs()
+        team_cards = state.hand_cards
 
         # consider all pair points we can get
         # my pairs
         if utils.gruen_pair() in state.hand_cards:
             estimated_value += 40
+            unknown_pairs.remove(utils.gruen_pair())
         if utils.eichel_pair() in state.hand_cards:
             estimated_value += 60
+            unknown_pairs.remove(utils.eichel_pair())
         if utils.schell_pair() in state.hand_cards:
             estimated_value += 80
+            unknown_pairs.remove(utils.schell_pair())
         if utils.rot_pair() in state.hand_cards:
             estimated_value += 100
+            unknown_pairs.remove(utils.rot_pair())
         estimated_max += estimated_value
 
         # partners pairs
-        if state.concepts.get_by_name(f"{state.partner()}_has_big_pair"):
+        # TODO add the logic to know which pairs we have exactly
+        # TODO put this logic in dependencies of concepts
+        if (state.concepts.get_by_name(f"{state.partner()}_has_big_pair") and
+                state.concepts.get_by_name(f"{state.partner()}_has_big_pair").value > 0.8):
             if (Card(Color.Schell, Value.Ober) in state.hand_cards or
                     Card(Color.Schell, Value.Koenig) in state.hand_cards):
                 estimated_value += 100
+                unknown_pairs.remove(utils.rot_pair())
+                team_cards |= utils.rot_pair()
             else:
                 estimated_value += 80
-        if state.concepts.get_by_name(f"{state.partner()}_has_small_pair"):
+                unknown_pairs.remove(utils.schell_pair())
+                if (Card(Color.Rot, Value.Ober) in state.hand_cards or
+                        Card(Color.Rot, Value.Koenig) in state.hand_cards):
+                    team_cards |= utils.schell_pair()
+        if (state.concepts.get_by_name(f"{state.partner()}_has_small_pair") and
+                state.concepts.get_by_name(f"{state.partner()}_has_small_pair").value > 0.8):
             if (Card(Color.Gruen, Value.Ober) in state.hand_cards or
                     Card(Color.Gruen, Value.Koenig) in state.hand_cards):
                 estimated_value += 60
+                unknown_pairs.remove(utils.eichel_pair())
+                team_cards |= utils.eichel_pair()
             else:
                 estimated_value += 40
+                unknown_pairs.remove(utils.gruen_pair())
+                if (Card(Color.Eichel, Value.Ober) in state.hand_cards or
+                        Card(Color.Eichel, Value.Koenig) in state.hand_cards):
+                    team_cards |= utils.rot_pair()
 
         # our pairs
-        if state.concepts.get_by_name(f"{state.partner()}_has_3+_halves"):
-
+        if (state.concepts.get_by_name(f"{state.partner()}_has_3+_halves") and
+                state.concepts.get_by_name(f"{state.partner()}_has_3+_halves").value > 0.8):
+            if len(unknown_pairs) == 4:
+                halves = utils.pair_cards()
+                hand_halves = [card for card in halves if card in state.hand_cards]
+                estimated_value += sum([card.color.points for card in utils.smallest_x(set(hand_halves),
+                                                                                       len(hand_halves) - 1)])
+            elif len(unknown_pairs) <= 3:
+                unknown_pair_cards = []
+                for pair in unknown_pairs:
+                    unknown_pair_cards += [card for card in pair]
+                hand_halves = [card for card in unknown_pair_cards if card in state.hand_cards]
+                estimated_value += sum([card.color.points for card in utils.smallest_x(set(hand_halves),
+                                                                                       len(hand_halves))])
 
         # estimate the standing cards we could have as a team
+        min_standing = 13
+        min_standing_cards = {}
+        if (state.concepts.get_by_name(f"{state.partner()}_has_ace")):
+            for ace in utils.ace_cards():
+                if not(ace in state.hand_cards):
+                    team_cards_ace = team_cards | ace
+                    standing = utils.standing_cards(set(Deck().cards), team_cards_ace)
+                    min_standing = min(len(standing), min_standing)
+
+        standing_points = 120
+        if min_standing >= 7:
+            standing_points = 140
+        else:
+            standing_points = sum([card.value.points for card in standing])
+        # estimate obstacles by enemy team
+        for pair in unknown_pairs:
+            pass
+            # need to check if we can destroy those pairs if we need to
+            # TODO
 
         # estimate last trick security
-
-        # estimate obstacles by enemy team
-
-        # estimate standing cards
+        # TODO
 
         return estimated_value, estimated_max
 

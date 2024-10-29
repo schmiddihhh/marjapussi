@@ -27,5 +27,5 @@ influenced by the agent's code).
 | "getting_played_black"                     | provoking             | getting played black                   |
 | "playing_black"                            | provoking             | playing the opponents "Schwarz"        |
 | f"{player_name}_has_{str(color)}_big_pair" | assessment / question | having specific pair                    |
-| f"{player}_has_{str(p_col)}_half"          | question              | having specific half                   |
+| f"{player_name}_has_{str(p_col)}_half"     | question              | having specific half                   |
 | "good_hand_cards"                          | assessment            | having very good cards on starting hand |
