@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from marjapussi.agent import Agent, test_agents
 from marjapussi.game import MarjaPussi
+from marjapussi.probabilistic_policy import ProbabilisticPolicy2
 
 import random
 import time
@@ -18,7 +19,7 @@ def main():
         "max_game_value": 140,
     }
     with stop_watch('Testen'):
-        test_agents(RandomPolicy(), LittleSmartPolicy(), rounds=1, custom_rules=custom_rules, log_agent=False,
+        test_agents(RandomPolicy(), ProbabilisticPolicy2(), rounds=1, custom_rules=custom_rules, log_agent=False,
                     log_game='DEBUG')
 
 

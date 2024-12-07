@@ -32,6 +32,7 @@ class GameState:
         self.cards_left = set(Deck().cards)
         self.player_cards_left: list[int] = [int(len(self.cards_left) / len(self.all_players)) for i in
                                              range(len(self.all_players))]
+        self.customs = {}
 
     def _set_secure_card(self, card: Card, player_name: str) -> None:
         self.secure_cards[player_name].add(card)

@@ -17,6 +17,7 @@ class Agent:
         self.all_players = all_players
         self.state = GameState(name, all_players, start_cards)
         self.policy = policy
+        self.policy.game_start(self.state)
         self.logger = logging.getLogger("single_agent_logger")
         self.log = log
         if log:
@@ -99,7 +100,7 @@ def test_agents(policy_a: Policy, policy_b: Policy, log_agent=False, log_game=Fa
     Plays specified number of rounds and returns wins and losses of policy_A and policy_B.
     """
     print(f"Testing {type(policy_a).__name__} vs {type(policy_b).__name__} in {rounds} games.")
-    players = ['10', '11', '12', '13']  # 0,2 play with policy_A and 1,3 with policy_B
+    players = ['0', '1', '2', '3']  # 0,2 play with policy_A and 1,3 with policy_B
     results = [[0, 0], [0, 0]]
     if not custom_rules:
         custom_rules = {}
