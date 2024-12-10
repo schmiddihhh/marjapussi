@@ -211,7 +211,7 @@ def gruen_pair() -> set[Card]:
 
 
 def eichel_pair() -> set[Card]:
-    return {Card(Color.Gruen, Value.Koenig), Card(Color.Gruen, Value.Ober)}
+    return {Card(Color.Eichel, Value.Koenig), Card(Color.Eichel, Value.Ober)}
 
 
 def schell_pair() -> set[Card]:
@@ -219,7 +219,7 @@ def schell_pair() -> set[Card]:
 
 
 def rot_pair() -> set[Card]:
-    return {Card(Color.Schell, Value.Koenig), Card(Color.Schell, Value.Ober)}
+    return {Card(Color.Rot, Value.Koenig), Card(Color.Rot, Value.Ober)}
 
 
 def small_pairs() -> list[set[Card]]:

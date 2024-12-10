@@ -82,3 +82,6 @@ class ConceptStore:
             property_objects = self.dict_by_properties[prop].get(value, set())
             matching_concepts &= property_objects  # intersect with the current matching concepts
         return matching_concepts
+    
+    def __str__(self):
+        return str([(concept.name, concept.value) for concept in self.dict_by_name.values()])

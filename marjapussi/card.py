@@ -75,6 +75,9 @@ class Card:
 
     def __str__(self) -> str:
         return f"{self.color}-{self.value}"
+    
+    def __repr__(self):
+        return self.__str__()
 
     def __eq__(self, other) -> bool:
         return self.color == other.color and self.value == other.value

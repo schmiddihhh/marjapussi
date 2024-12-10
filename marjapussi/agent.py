@@ -12,10 +12,10 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 
 class Agent:
     """Implements an agent able to play Marjapussi."""
-    def __init__(self, name: str, all_players: list[str], policy: Policy, start_cards: list[Card], log=False) -> None:
+    def __init__(self, name: str, all_players: list[str], policy: Policy, start_cards: list[Card], opponent_policy: type, log=False) -> None:
         self.name = name
         self.all_players = all_players
-        self.state = GameState(name, all_players, start_cards)
+        self.state = GameState(name, all_players, start_cards, opponent_policy)
         self.policy = policy
         self.policy.game_start(self.state)
         self.logger = logging.getLogger("single_agent_logger")
@@ -31,6 +31,8 @@ class Agent:
 
     def next_action(self, possible_actions: list[Action]):
         self.logger.debug(f"{self} selects action.")
+        # bugfix: policy was given the wrong phase before, since it was only changed in observe_action afterwards
+        self.state.phase = possible_actions[0].phase
         return self.policy.select_action(self.state, possible_actions)
 
     def observe_action(self, action: Action) -> None:
@@ -108,7 +110,7 @@ def test_agents(policy_a: Policy, policy_b: Policy, log_agent=False, log_game=Fa
     for _ in trange(rounds, leave=False):
         test_game = MarjaPussi(players, log=log_game, fancy=True, override_rules=custom_rules)
         agents = {player.name: Agent(player.name, [p.name for p in test_game.players],
-                                     policy_a if int(player.name) % 2 == 0 else policy_b, player.cards, log=log_agent)
+                                     policy_a if int(player.name) % 2 == 0 else policy_b, player.cards, type(policy_b) if int(player.name) % 2 == 0 else type(policy_a), log=log_agent)
                   for player in test_game.players}
 
         while test_game.phase != "DONE":

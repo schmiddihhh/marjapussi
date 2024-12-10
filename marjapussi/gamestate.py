@@ -5,10 +5,11 @@ from marjapussi.action import Talk, Action
 from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite, \
     calculate_set_in_3set_probability
 from marjapussi.concept import Concept, ConceptStore
+import numpy as np
 
 
 class GameState:
-    def __init__(self, name: str, all_players: list[str], start_cards: list[Card]):
+    def __init__(self, name: str, all_players: list[str], start_cards: list[Card], opponent_policy: type):
         self.name = name
         self.player_num = all_players.index(name)  # the player with index 0 is always first
         self.game_rules = GameRules()
@@ -33,6 +34,8 @@ class GameState:
         self.player_cards_left: list[int] = [int(len(self.cards_left) / len(self.all_players)) for i in
                                              range(len(self.all_players))]
         self.customs = {}
+        self.opponent_policy = opponent_policy
+        self.possible_pairs: dict[Color, bool] = {}
 
     def _set_secure_card(self, card: Card, player_name: str) -> None:
         self.secure_cards[player_name].add(card)
@@ -42,9 +45,9 @@ class GameState:
     def play_card(self, card_played: Card, player_num: int):
         # do the action on the agents representation of the trick
         player_name = self.all_players[player_num]
-        assert card_played in (self.possible_cards[player_name] | self.secure_cards[player_name]), \
-            (f"Card has to be possible for player {self.name}'s view, if it is played. Cards still possible:"
-             f" {[str(card) for card in (self.possible_cards[player_name] | self.secure_cards[player_name])]}")
+        # assert card_played in (self.possible_cards[player_name] | self.secure_cards[player_name]), \
+        #     (f"Card has to be possible for player {self.name}'s view, if it is played. Cards still possible:"
+        #      f" {[str(card) for card in (self.possible_cards[player_name] | self.secure_cards[player_name])]}")
         self.current_trick.play_card(card_played, player_num)
 
         # remove the card played from all players, it is no longer in the game
@@ -53,9 +56,6 @@ class GameState:
         for player in self.all_players:
             self.possible_cards[player].discard(card_played)
             self.secure_cards[player].discard(card_played)
-
-        # apply game logic to deduct what is still possible for that player
-        self._possible_player_cards(player_name, self.current_trick)
 
         # apply game logic to deduct information from players pairs and halves in combination with the played card
         self._pair_concepts_check(player_name, card_played)
@@ -69,6 +69,16 @@ class GameState:
             self.current_trick = Trick(self.current_trick.trump_color)
         else:
             self.current_trick = self.current_trick
+
+        if card_played.value == Value.Ober or card_played.value == Value.Koenig:
+            self.possible_pairs[card_played.color] = False
+
+    def deduct_pairs_from_concepts(self) -> None:
+        """
+        Deduct which pairs are still possible (after provoking and passing forth and back) for our team.
+        """
+        # TODO: implement
+        pass
 
     def provoke(self, action: Action):
         if action.content > 0:
@@ -86,6 +96,11 @@ class GameState:
             if self.provoking_history[i].player_number == player_number:
                 prov_base = max(provoking_history_ints[:i + 1])
                 steps.append(max(0, self.provoking_history[i].content - prov_base))
+
+        # if steps == [5, 5]:
+        #     print([(action.player_number, action.content) for action in self.provoking_history])
+        #     print(player_number)
+        #     print(steps)
 
         return steps
 
@@ -183,29 +198,16 @@ class GameState:
         - played card called needs to be removed, we don't know anymore
         """
         p_val = played_card.value
-        p_col = played_card.color
         if (p_val == Value.Ober) | (p_val == Value.Koenig):
-            other_val = Value.Koenig if p_val == Value.Ober else Value.Ober
-            other_card = Card(p_col, other_val)
-            for player in self.all_players:
-                # check for half calls
-                for concept in self.concepts.get_all_by_properties({"color": p_col,
-                                                                    "player": player, "info_type": "half"}):
-                    # we could either have the concept that the player has or doesn't have a half
-                    if concept.name == f"{player}_has_{str(p_col)}_half":
-                        # if it's the one who played we remove that, else we now know the specific card!
-                        if player_name == player:
-                            self.concepts.remove(concept.name)
-                        else:
-                            if not (other_card in (self.possible_cards[player] | self.secure_cards[player])):
-                                raise ValueError(f"{player} announced a card {str(other_card)} but doesn't posses one.")
-                            self._set_secure_card(Card(p_col, other_val), player)
-            # check for no pair calls
-            if self.concepts.get_by_name(f"{player_name}_has_no_pair"):
-                if not self.concepts.get_by_name(f"{player_name}_has_{played_card.color}_pair"):
-                    self.remove_possibles(player_name, [other_card])
-            # after this, the pair can't be in one hand anymore!
-            self.concepts.remove(f"{player_name}_has_{played_card.color}_pair")
+            # check for half calls
+            if self.concepts.get_by_name(f"{player_name}_has_2_halves"):
+                # remove the concept
+                self.concepts.remove(f"{player_name}_has_2_halves")
+            elif self.concepts.get_by_name(f"{player_name}_has_3+_halves"):
+                # go down to 2 halves
+                # TODO: fix this to be correct
+                self.concepts.remove(f"{player_name}_has_3+_halves")
+                self.concepts.add(Concept(f"{player_name}_has_2_halves", {}, value=1.0))
 
     def _set_logic_check(self):
         """ruling out possible cards by simple set logic:"""
@@ -251,7 +253,7 @@ class GameState:
             return standing_in_suite(self.cards_left, trump, potential_player_hand)
 
         # If no trump, check each suit in hand
-        for suit in set(card.suit for card in potential_player_hand):
+        for suit in set(card.color for card in potential_player_hand):
             # Only consider cards in hand of this suit
             suit_hand_cards = set([card for card in potential_player_hand if card.color == suit])
             standing_cards |= standing_in_suite(self.cards_left, suit, suit_hand_cards)
@@ -267,7 +269,7 @@ class GameState:
 
     def partner_num(self, player_num: int = None) -> int:
         """Returns the partners number for a given player. Without input returns the partner of the gamestate owner"""
-        if not player_num:
+        if player_num == None:
             player_num = self.all_players.index(self.name)
         return (player_num + 2) % 4
 

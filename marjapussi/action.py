@@ -23,6 +23,19 @@ class Talk:
 
 
 class Action:
+    """
+    phases:
+    PROV - provoking
+    PASS - Passing 4 cards forward
+    PBCK - Pushing 4 cards back
+    PRMO - Increasing to game value
+    FTRI - UNKNOWN, NOT USED?!
+    QUES - Asking for pairs or halves
+    ANSW - Answering for pairs and halves
+    ANSS - Answering if questioning player too has a half
+    TRCK - Playing cards into the Trick
+    DONE - After the game is done
+    """
     def __init__(self, player_number: int, phase: str, content: int | Card | Talk):
         self.player_number = player_number
         self.phase = phase

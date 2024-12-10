@@ -14,12 +14,13 @@ from marjapussi.policy import LittleSmartPolicy
 # random.seed(2)
 
 def main():
-    custom_rules = {
-        "start_game_value": 115,
-        "max_game_value": 140,
-    }
+    # custom_rules = {
+    #     "start_game_value": 115,
+    #     "max_game_value": 140,
+    # }
+    custom_rules = {}
     with stop_watch('Testen'):
-        test_agents(RandomPolicy(), ProbabilisticPolicy2(), rounds=1, custom_rules=custom_rules, log_agent=False,
+        test_agents(ProbabilisticPolicy2(), ProbabilisticPolicy2(), rounds=1, custom_rules=custom_rules, log_agent=False,
                     log_game='DEBUG')
 
 

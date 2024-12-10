@@ -37,6 +37,15 @@ class MarjaPussi():
         assert len(player_names) == 4, "There have to be 4 names!"
         deck = Deck()
         shuffle(deck.cards)
+        # the following code was used to reproduce an error for debugging and was left here for the case of needing this again
+        # cards = "g-8 g-O g-Z e-6 e-8 e-O s-6 s-8 s-O\ng-9 g-K e-7 e-9 e-A s-U r-6 r-9 r-O\ng-6 g-7 g-U e-Z s-7 s-K s-A r-U r-Z\ng-A e-U e-K s-9 s-Z r-7 r-8 r-K r-A"
+        # card_lists = [[Card(card.split("-")[0], card.split("-")[1]) for card in line.split(" ")] for line in cards.splitlines()]
+        # print([[(str(card.color), str(card.value)) for card in card_list]for card_list in card_lists])
+        # deck.cards = []
+        # card_lists.reverse()
+        # for _ in range(9):
+        #     for card_list in card_lists:
+        #         deck.cards.append(card_list.pop(0))
         self.players = [Player(name, num, self.rules["points"])
                         for num, name in enumerate(player_names)]
         # only used for logging
@@ -158,7 +167,7 @@ class MarjaPussi():
                 self.playing_player = self.player_at_turn
                 self.player_at_turn = self.playing_player.partner
                 self.logger.info(
-                    f"{self.player_at_turn.name} {MarjaPussi.INFO_MSG['takes_the_game'][self.language]} {self.game_value}.")
+                    f"{self.playing_player.name} {MarjaPussi.INFO_MSG['takes_the_game'][self.language]} {self.game_value}.")
                 self.phase = "PASS"
 
     def legal_pass(self) -> list[Action]:
@@ -445,7 +454,7 @@ class MarjaPussi():
         }
 
     INFO_MSG = {
-        "got_their_cards": ["All players got their cards.", "Alle Spieler erhalten ihre Karten."],
+        "got_their_cards": ["All players got their cards.", "Alle Spieler haben ihre Karten erhalten."],
         "player_says": ["says", "sagt"],
         "is_gone": ["is gone.", "ist weg."],
         "noon_plays": ["No one takes the game.", "Niemand spielt das Spiel."],
