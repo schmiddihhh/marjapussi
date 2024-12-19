@@ -51,10 +51,12 @@ class Concept:
 class ConceptStore:
     def __init__(self):
         self.dict_by_name = {}
+        self.count_by_name = defaultdict(int)
         self.dict_by_properties = defaultdict(lambda: defaultdict(set))
 
     def add(self, concept: Concept) -> None:
         self.dict_by_name[concept.name] = concept
+        self.count_by_name[concept.name] += 1
         for prop, value in concept.properties.items():
             self.dict_by_properties[prop][value].add(concept)
 
@@ -62,7 +64,11 @@ class ConceptStore:
         obj = self.dict_by_name.get(name)
         if obj is not None:
             # Remove from dict_by_name
-            del self.dict_by_name[name]
+            if self.count_by_name[name] == 1:
+                del self.count_by_name[name]
+                del self.dict_by_name[name]
+            elif self.count_by_name[name] > 1:
+                self.count_by_name[name] -= 1
             # Remove from dict_by_properties
             for prop, value in obj.properties.items():
                 self.dict_by_properties[prop][value].remove(obj)

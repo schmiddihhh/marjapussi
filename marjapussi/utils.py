@@ -185,19 +185,14 @@ def standing_in_suite(leftover_cards: set[Card], color: Color, possible_cards: s
     standing = []
     for card in col_cards:
         stand_nr = len(standing)
-        if not majority:
-            if card == all_col_cards_left[stand_nr]:
-                standing.append(card)
-            else:
-                break
+        if card == all_col_cards_left[stand_nr]:
+            standing.append(card)
         else:
-            no_higher_zone = all_col_cards_left[stand_nr:(2*stand_nr+1)]
-            if card in no_higher_zone:
-                standing.append(card)
-            else:
-                break
-
-    return set(standing)
+            break
+    if len(standing) >= len(set(all_col_cards_left) - set(col_cards)):
+        return set(col_cards)
+    else:
+        return set(standing)
 
 
 def standing_cards(leftover_cards: set[Card], possible_cards: set[Card]) -> set[Card]:
@@ -278,3 +273,14 @@ def smallest_x(cards: set[Card], x: int) -> list[Card]:
     returns the smallest x cards out of the given cards, order: g6 -> gA, e6 -> eA, s6 -> sA, r6 -> rA
     """
     return sorted_cards(list(cards))[0:x]
+
+def least_frequent_color(cards: set[Card]) -> Color:
+    """
+    Returns the least frequent color in the given set.
+    If there are multiple colors with the same (minimal) frequency, a random one is returned.
+    """
+    colors = [color for color in Color]
+    frequencies = [0 for _ in colors]
+    for index, color in enumerate(colors):
+        frequencies[index] = len([card for card in cards if card.color == color])
+    return colors[frequencies.index(min(frequencies))]

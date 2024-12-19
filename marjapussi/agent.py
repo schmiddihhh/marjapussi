@@ -59,7 +59,7 @@ class Agent:
 
             case 'QUES':
                 question: Talk = action.content
-                self.state.ask_question(question.pronoun, player_name)
+                self.state.ask_question(question, player_name)
 
             case 'ANSW':
                 answer: Talk = action.content

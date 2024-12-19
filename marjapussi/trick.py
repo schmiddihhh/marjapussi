@@ -57,3 +57,21 @@ class Trick:
             return self.cards.index(high_card)
         else:
             return -1
+        
+    def taken_by(self, card: Card) -> bool:
+        # in the beginning, every card will take the trick
+        if self.get_status() == 0:
+            return True
+        # if the highest card is not in the trump color, every trump card will take the trick
+        # and every card in the base color higher than the high card will too
+        high_card = self._high_card()
+        if high_card.color != self.trump_color:
+            if card.color == self.trump_color or \
+               card.color == high_card.color and card.value > high_card.value:
+                return True
+        # else the card will only win if it is higher than the currently highest card
+        elif card.value > high_card.value:
+            return True
+        # if all of this does not apply, the card will not take the trick
+        return False
+

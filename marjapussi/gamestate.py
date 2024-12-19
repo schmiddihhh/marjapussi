@@ -3,18 +3,18 @@ from marjapussi.gamerules import GameRules
 from marjapussi.trick import Trick
 from marjapussi.action import Talk, Action
 from marjapussi.utils import higher_cards, all_color_cards, all_value_cards, standing_in_suite, \
-    calculate_set_in_3set_probability
+    calculate_set_in_3set_probability, pairs, small_pairs, big_pairs
 from marjapussi.concept import Concept, ConceptStore
 import numpy as np
 
 
 class GameState:
     def __init__(self, name: str, all_players: list[str], start_cards: list[Card], opponent_policy: type):
-        self.name = name
-        self.player_num = all_players.index(name)  # the player with index 0 is always first
+        self.name = name    # name of the gamestate owner
+        self.player_num = all_players.index(name)  # number of the gamestate owner
         self.game_rules = GameRules()
         self.provoking_history: list[Action] = []
-        self.game_value = 115  # TODO use value from game rules
+        self.game_value = self.game_rules.start_game_value
         self.current_trick = Trick()
         self.playing_party = None
         self.all_tricks = []
@@ -33,9 +33,49 @@ class GameState:
         self.cards_left = set(Deck().cards)
         self.player_cards_left: list[int] = [int(len(self.cards_left) / len(self.all_players)) for i in
                                              range(len(self.all_players))]
-        self.customs = {}
         self.opponent_policy = opponent_policy
-        self.possible_pairs: dict[Color, bool] = {}
+        self.unannouncable_pairs = []
+        self.aces_on_hand = []
+        self.to_communicate = []    # list of all infos in the original hand cards that we want to communicate
+        self.got_cards_passed: list[Card] = []
+        self.passed_cards: list[Card] = []
+
+    def small_pairs_on_hand(self) -> list[Color]:
+        return [pair.pop().color for pair in small_pairs() if pair.issubset(self.hand_cards)]
+    
+    def big_pairs_on_hand(self) -> list[Color]:
+        return [pair.pop().color for pair in big_pairs() if pair.issubset(self.hand_cards)]
+    
+    def pairs_on_hand(self) -> list[Color]:
+        return self.small_pairs_on_hand() + self.big_pairs_on_hand()
+    
+    def standalone_halves_on_hand(self) -> list[Card]:
+        pairs = self.small_pairs_on_hand() + self.big_pairs_on_hand()
+        return [card for card in self.hand_cards if (card.value == Value.Ober or card.value == Value.Koenig) and card.color not in pairs]
+
+    def have_secure_pair(self) -> bool:
+        """
+        Finds out if we have a secure pair in the team.
+        """
+        partner_has_pair_concept = (self.concepts.get_by_name(f"{self.partner()}_has_big_pair") or self.concepts.get_by_name(f"{self.partner()}_has_small_pair"))
+        partner_has_pair = partner_has_pair_concept and partner_has_pair_concept.value == 1.0
+        return self.big_pairs_on_hand() or \
+               self.small_pairs_on_hand() or \
+               partner_has_pair or \
+               self.concepts.get_by_name(f"{self.name}_has_3+_halves") and (self.concepts.get_by_name(f"{self.partner()}_has_3+_halves") or self.concepts.get_by_name(f"{self.partner()}_has_2_halves")) or \
+               self.concepts.get_by_name(f"{self.name}_has_2_halves") and self.concepts.get_by_name(f"{self.partner()}_has_3+_halves")
+
+    def secure_pairs(self) -> list[tuple[str, Color]]:
+        """
+        Return a list with all positions of secure pairs (MY, YOURS, OUR) and, if known, the respective Color.
+        """
+        secures = []
+        # first check if there is one or more pairs in the hand cards
+        for pair in pairs():
+            if pair.issubset(self.hand_cards):
+                secures.append(("MY", pair.pop().color))
+        # now check if the partner announced a pair or if we passed him one
+        # TODO
 
     def _set_secure_card(self, card: Card, player_name: str) -> None:
         self.secure_cards[player_name].add(card)
@@ -70,15 +110,16 @@ class GameState:
         else:
             self.current_trick = self.current_trick
 
-        if card_played.value == Value.Ober or card_played.value == Value.Koenig:
-            self.possible_pairs[card_played.color] = False
-
-    def deduct_pairs_from_concepts(self) -> None:
+    def possible_pairs(self) -> None:
         """
         Deduct which pairs are still possible (after provoking and passing forth and back) for our team.
         """
-        # TODO: implement
-        pass
+        possibles = self.hand_cards.issubset()
+        for card in self.possible_cards[self.partner()]:
+            for card2 in self.hand_cards:
+                if set(card, card2) in pairs():
+                    possibles.append(card.color)
+        return possibles
 
     def provoke(self, action: Action):
         if action.content > 0:
@@ -111,8 +152,10 @@ class GameState:
         self.possible_cards[self.all_players[(player_num + 1) % 4]].discard(card_pass)
         self.possible_cards[self.all_players[(partner_num + 1) % 4]].discard(card_pass)
 
-    def ask_question(self, pronoun: str, player_name: str):
-        match pronoun:
+    def ask_question(self, question: Talk, player_name: str):
+        match question.pronoun:
+            case "my":
+                self.current_trick.trump_color = question.color
             case "our":
                 self.asking_status[player_name] = 2
             case "yours":
@@ -136,6 +179,7 @@ class GameState:
                 self.current_trick.trump_color = answer.color
                 self.concepts.add(Concept(f"{player_name}_has_{answer.color}_pair",
                                           {"color": answer.color, "player": player_name, "info_type": "pair"}))
+                self.unannouncable_pairs.append(answer.color)
             case "ou":
                 pair = {Card(answer.color, Value.Koenig), Card(answer.color, Value.Ober)}
                 poss_update = self.possible_cards[player_name].intersection(pair)
@@ -144,6 +188,8 @@ class GameState:
                 else:
                     self.concepts.add(Concept(f"{player_name}_has_{str(answer.color)}_half",
                                               {"color": answer.color, "player": player_name, "info_type": "half"}))
+                self.current_trick.trump_color = answer.color
+                self.unannouncable_pairs.append(answer.color)
         self._set_logic_check()
 
     def announce_ansage(self, ansage: Talk, player_name: str):
@@ -240,19 +286,22 @@ class GameState:
             else:
                 updated = False
 
-    def standing_cards(self, player_name: str = None, trump: Color = '') -> set[Card]:
+    def standing_cards(self, player_name: str = None) -> set[Card]:
         """Returns all cards for the player_name (by default state owner) which can or could win the trick."""
         standing_cards = set()
         if player_name is None:
             player_name = self.name
+        trump = self.current_trick.trump_color
+        if trump:
+            trump_cards = [card for card in self.cards_left if card.color == trump]
 
         potential_player_hand = self.secure_cards[player_name] | self.possible_cards[player_name]
         # If there's a trump suit, only the highest trump cards in hand are standing
-        if trump:
-            trump_cards_in_hand = [card for card in potential_player_hand if card.suit == trump]
+        if trump and trump_cards:
+            trump_cards_in_hand = [card for card in potential_player_hand if card.color == trump]
             return standing_in_suite(self.cards_left, trump, potential_player_hand)
 
-        # If no trump, check each suit in hand
+        # If no trump or all trump colors are out, check each suit in hand
         for suit in set(card.color for card in potential_player_hand):
             # Only consider cards in hand of this suit
             suit_hand_cards = set([card for card in potential_player_hand if card.color == suit])

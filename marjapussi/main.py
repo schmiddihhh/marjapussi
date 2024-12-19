@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from marjapussi.agent import Agent, test_agents
 from marjapussi.game import MarjaPussi
-from marjapussi.probabilistic_policy import ProbabilisticPolicy2
+from marjapussi.probabilistic_policy import JonasPolicy
 
 import random
 import time
@@ -20,7 +20,7 @@ def main():
     # }
     custom_rules = {}
     with stop_watch('Testen'):
-        test_agents(ProbabilisticPolicy2(), ProbabilisticPolicy2(), rounds=1, custom_rules=custom_rules, log_agent=False,
+        test_agents(JonasPolicy(), JonasPolicy(), rounds=1, custom_rules=custom_rules, log_agent=False,
                     log_game='DEBUG')
 
 

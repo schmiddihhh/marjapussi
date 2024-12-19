@@ -1,4 +1,4 @@
-from random import shuffle
+from random import shuffle, seed, randint
 import marjapussi.utils as utils
 from marjapussi.player import Player
 from marjapussi.card import Card, Deck, Color
@@ -36,9 +36,13 @@ class MarjaPussi():
         # init players and cards
         assert len(player_names) == 4, "There have to be 4 names!"
         deck = Deck()
+        current_seed = randint(0, 1000)
+        current_seed = 493
+        print("SEED", current_seed)
+        seed(current_seed)
         shuffle(deck.cards)
         # the following code was used to reproduce an error for debugging and was left here for the case of needing this again
-        # cards = "g-8 g-O g-Z e-6 e-8 e-O s-6 s-8 s-O\ng-9 g-K e-7 e-9 e-A s-U r-6 r-9 r-O\ng-6 g-7 g-U e-Z s-7 s-K s-A r-U r-Z\ng-A e-U e-K s-9 s-Z r-7 r-8 r-K r-A"
+        # cards = "g-6 g-O g-K e-9 e-K s-7 s-8 r-6 r-7\ng-A e-7 e-8 e-O e-Z e-A s-O s-A r-O\ng-7 g-9 g-Z e-6 e-U s-U r-8 r-9 r-A\ng-8 g-U s-6 s-9 s-K s-Z r-U r-K r-Z"
         # card_lists = [[Card(card.split("-")[0], card.split("-")[1]) for card in line.split(" ")] for line in cards.splitlines()]
         # print([[(str(card.color), str(card.value)) for card in card_list]for card_list in card_lists])
         # deck.cards = []
